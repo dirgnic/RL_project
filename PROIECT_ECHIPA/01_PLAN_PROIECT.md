@@ -1,7 +1,17 @@
 #  PLAN PROIECT RL - Echipa Irina, Ingrid, Matei, Iustin
 
 **Deadline prezentare:** Săptămâna 14 (ianuarie 2026)  
-**Data ultimului update:** 29 noiembrie 2025
+**Data ultimului update:** 30 noiembrie 2025
+
+---
+
+## 🎯 ENVIRONMENT ALES: **TAXI-V3 (Extended)**
+
+### Task Split (Official):
+- **Person A (Iustin):** Taxi world designer - Add extensions (extra passengers/fuel/obstacles)
+- **Person B (Irina):** Tabular RL engineer - Q-learning & SARSA implementation
+- **Person C (Ingrid):** Deep value-based engineer - **DQN implementation**
+- **Person D (Matei):** Policy-based engineer - REINFORCE implementation
 
 ---
 
@@ -9,31 +19,32 @@
 
 ### Ce trebuie să livrăm:
  **Environment ales/modificat**
-- Putem lua unul din Gymnasium și să modificăm reward-urile
-- Proful a zis: modificarea = reward shaping (experimentăm cu reward-uri)
+- ✅ **TAXI-V3** with extensions (extra passengers, fuel, traffic penalties)
+- Iustin implementează wrapper-ul custom peste Taxi-v3
 
  **Minim 3 algoritmi RL** din categorii diferite
-- Trebuie implementați + rulați pe același environment
-- Recomandare: combinație tabular + deep + policy-based
+- ✅ **Tabular:** Q-learning & SARSA (Irina)
+- ✅ **Deep Value-Based:** DQN (Ingrid)
+- ✅ **Policy-Based:** REINFORCE (Matei)
 
  **Experimente & tuning hiperparametri**
-- Schimbăm seed-uri, learning rate, epsilon, etc.
-- Comparăm reward default vs reward modificat
-- Analizăm convergența, instabilități
+- Comparare: Original Taxi-v3 vs Extended Taxi
+- Tuning pentru fiecare algoritm
+- Ablation studies pentru extensii
 
  **Rezultate vizualizate**
-- Grafice: reward în timp, loss, convergență
-- Tabele comparative: metrici de performanță
-- Seed-uri fixe pentru reproducibilitate
+- Training curves (reward, loss, convergență)
+- Comparison plots: Tabular vs DQN vs REINFORCE
+- State space analysis
 
  **Documentație**
 - PowerPoint / PDF / LaTeX
 - **FĂRĂ LLM pentru text!** (proful verifică)
-- Structură: Intro → Environment → Algoritmi → Experimente → Concluzii
+- Structură: Intro → Taxi Extensions → Algoritmi → Experimente → Concluzii
 
  **Prezentare în echipă** (săptămâna 14)
-- Toți trebuie să poată explica ce au făcut
-- Trebuie să știm ce e în cod (dacă întreabă)
+- Fiecare prezintă partea sa
+- Explicăm de ce Taxi-v3 + ce extensii am adăugat
 
 ---
 
