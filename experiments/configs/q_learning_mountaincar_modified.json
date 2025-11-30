@@ -1,0 +1,28 @@
+{
+    "experiment_name": "q_learning_mountaincar_potential",
+    "seed": 42,
+    "environment": {
+        "name": "MountainCar-v0",
+        "reward_type": "potential_based"
+    },
+    "hyperparameters": {
+        "alpha": 0.1,
+        "gamma": 0.99,
+        "epsilon_start": 1.0,
+        "epsilon_end": 0.01,
+        "epsilon_decay": 0.995,
+        "num_episodes": 2000
+    },
+    "discretization": {
+        "enabled": true,
+        "bins": {
+            "0": 20,
+            "1": 20
+        }
+    },
+    "logging": {
+        "log_interval": 100,
+        "save_model": true,
+        "save_interval": 400
+    }
+}
