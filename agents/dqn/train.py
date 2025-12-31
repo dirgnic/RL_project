@@ -12,7 +12,7 @@ Features:
 Run with: python agents/dqn/train.py
 """
 
-import gymnasium as gym
+from env import load_environment
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
@@ -31,7 +31,7 @@ plt.rcParams['figure.figsize'] = (12, 6)
 
 
 def train_dqn(
-    env_name='Taxi-v3',
+    env_name='MyCustomEnv',
     num_episodes=2000,
     max_steps=200,
     learning_rate=1e-3,
@@ -39,9 +39,9 @@ def train_dqn(
     epsilon_start=1.0,
     epsilon_end=0.01,
     epsilon_decay=0.995,
-    buffer_capacity=10000,
-    batch_size=64,
-    target_update_freq=100,
+    buffer_capacity=50000,  # Tuned value
+    batch_size=128,         # Tuned value
+    target_update_freq=500, # Tuned value
     seed=42
 ):
     """
@@ -64,14 +64,11 @@ def train_dqn(
     torch.manual_seed(seed)
     
     # Create environment
-    env = gym.make(env_name)
-    env.reset(seed=seed)
-    
-    # Get state and action dimensions
-    # For Taxi-v3: state_size=500, action_size=6
-    state_size = env.observation_space.n
-    action_size = env.action_space.n
-    
+    env = load_environment(env_name)
+    obs, _ = env.reset(seed=seed)
+    # Assume obs is np.ndarray with extra features at the end
+    state_size = obs.shape[0]
+    action_size = env.action_space.shape[0] if hasattr(env.action_space, 'shape') else env.action_space.n
     print(f"Environment: {env_name}")
     print(f"State space: {state_size}")
     print(f"Action space: {action_size}")
@@ -102,26 +99,20 @@ def train_dqn(
         state, _ = env.reset()
         episode_reward = 0
         episode_loss = []
-        
         for step in range(max_steps):
             # Select action
             action = agent.select_action(state, training=True)
-            
             # Take action
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
-            
             # Store transition
             agent.store_transition(state, action, reward, next_state, done)
-            
             # Train
             loss = agent.train_step()
             if loss is not None:
                 episode_loss.append(loss)
-            
             episode_reward += reward
             state = next_state
-            
             if done:
                 break
         

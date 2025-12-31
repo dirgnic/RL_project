@@ -24,48 +24,45 @@ class DQNNetwork(nn.Module):
         hidden_dims: List of hidden layer sizes (default: [128, 64])
     """
     
-    def __init__(self, state_size=500, action_size=6, embedding_dim=64, hidden_dims=[128, 64]):
+    def __init__(self, state_size=500, action_size=6, embedding_dim=64, hidden_dims=[128, 64],
+                 use_one_hot=False, extra_feature_dim=0):
         super(DQNNetwork, self).__init__()
-        
         self.state_size = state_size
         self.action_size = action_size
-        
-        # State embedding layer (learns to represent discrete states)
-        self.embedding = nn.Embedding(state_size, embedding_dim)
-        
+        self.use_one_hot = use_one_hot
+        self.extra_feature_dim = extra_feature_dim
+        if use_one_hot:
+            input_dim = state_size + extra_feature_dim
+        else:
+            self.embedding = nn.Embedding(state_size, embedding_dim)
+            input_dim = embedding_dim + extra_feature_dim
         # Build hidden layers
         layers = []
-        input_dim = embedding_dim
-        
         for hidden_dim in hidden_dims:
             layers.append(nn.Linear(input_dim, hidden_dim))
             layers.append(nn.ReLU())
             input_dim = hidden_dim
-        
         self.hidden = nn.Sequential(*layers)
-        
-        # Output layer: Q-values for each action
         self.output = nn.Linear(hidden_dims[-1], action_size)
-        
-    def forward(self, state):
+
+    def forward(self, state, extra_features=None):
         """
         Forward pass
-        
         Args:
-            state: Tensor of shape (batch_size,) containing state indices
-            
+            state: Tensor of shape (batch_size,) containing state indices (int) or one-hot (if use_one_hot)
+            extra_features: Optional tensor of shape (batch_size, extra_feature_dim)
         Returns:
             q_values: Tensor of shape (batch_size, action_size)
         """
-        # Embed the discrete state
-        x = self.embedding(state)
-        
-        # Pass through hidden layers
+        if self.use_one_hot:
+            # Convert state indices to one-hot
+            x = F.one_hot(state, num_classes=self.state_size).float()
+        else:
+            x = self.embedding(state)
+        if self.extra_feature_dim > 0 and extra_features is not None:
+            x = torch.cat([x, extra_features], dim=-1)
         x = self.hidden(x)
-        
-        # Get Q-values for all actions
         q_values = self.output(x)
-        
         return q_values
 
 

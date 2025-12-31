@@ -41,7 +41,9 @@ class DQNAgent:
         device: Optional[torch.device] = None,
         use_double_dqn: bool = False,
         hidden_dims: list = None,
-        embedding_dim: int = 64
+        embedding_dim: int = 64,
+        use_one_hot: bool = False,
+        extra_feature_dim: int = 0
     ):
         """
         Initialize DQN Agent
@@ -85,12 +87,15 @@ class DQNAgent:
             hidden_dims = [128, 64]
             
         self.policy_net = DQNNetwork(
-            state_size, action_size, embedding_dim, hidden_dims
+            state_size, action_size, embedding_dim, hidden_dims,
+            use_one_hot=use_one_hot, extra_feature_dim=extra_feature_dim
         ).to(self.device)
-        
         self.target_net = DQNNetwork(
-            state_size, action_size, embedding_dim, hidden_dims
+            state_size, action_size, embedding_dim, hidden_dims,
+            use_one_hot=use_one_hot, extra_feature_dim=extra_feature_dim
         ).to(self.device)
+        self.use_one_hot = use_one_hot
+        self.extra_feature_dim = extra_feature_dim
         
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
@@ -108,7 +113,7 @@ class DQNAgent:
         self.steps = 0
         self.episodes = 0
     
-    def select_action(self, state: int, training: bool = True) -> int:
+    def select_action(self, state: int, extra_features: np.ndarray = None, training: bool = True) -> int:
         """
         Select action using epsilon-greedy policy
         
@@ -121,10 +126,13 @@ class DQNAgent:
         """
         if training and np.random.rand() < self.epsilon:
             return np.random.randint(self.action_size)
-        
         with torch.no_grad():
             state_tensor = torch.tensor([state], dtype=torch.long, device=self.device)
-            q_values = self.policy_net(state_tensor)
+            if self.extra_feature_dim > 0 and extra_features is not None:
+                extra_tensor = torch.tensor([extra_features], dtype=torch.float32, device=self.device)
+                q_values = self.policy_net(state_tensor, extra_tensor)
+            else:
+                q_values = self.policy_net(state_tensor)
             return q_values.argmax().item()
     
     def store_transition(
@@ -138,7 +146,7 @@ class DQNAgent:
         """Store transition in replay buffer"""
         self.memory.push(state, action, reward, next_state, done)
     
-    def train_step(self) -> Optional[float]:
+    def train_step(self, extra_features_batch=None, next_extra_features_batch=None) -> Optional[float]:
         """
         Perform one training step
         
@@ -150,43 +158,40 @@ class DQNAgent:
         
         # Sample batch
         states, actions, rewards, next_states, dones = self.memory.sample(self.batch_size)
-        
-        # To tensors
         states = torch.tensor(states, dtype=torch.long, device=self.device)
         actions = torch.tensor(actions, dtype=torch.long, device=self.device)
         rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)
         next_states = torch.tensor(next_states, dtype=torch.long, device=self.device)
         dones = torch.tensor(dones, dtype=torch.float32, device=self.device)
-        
-        # Current Q-values
-        current_q = self.policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
-        
-        # Target Q-values
+        # Handle extra features if provided
+        if self.extra_feature_dim > 0 and extra_features_batch is not None:
+            extra_features = torch.tensor(extra_features_batch, dtype=torch.float32, device=self.device)
+            current_q = self.policy_net(states, extra_features).gather(1, actions.unsqueeze(1)).squeeze(1)
+        else:
+            current_q = self.policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
         with torch.no_grad():
-            if self.use_double_dqn:
-                # Double DQN: use policy net to select action, target net to evaluate
-                next_actions = self.policy_net(next_states).argmax(1)
-                next_q = self.target_net(next_states).gather(1, next_actions.unsqueeze(1)).squeeze(1)
+            if self.extra_feature_dim > 0 and next_extra_features_batch is not None:
+                next_extra_features = torch.tensor(next_extra_features_batch, dtype=torch.float32, device=self.device)
+                if self.use_double_dqn:
+                    next_actions = self.policy_net(next_states, next_extra_features).argmax(1)
+                    next_q = self.target_net(next_states, next_extra_features).gather(1, next_actions.unsqueeze(1)).squeeze(1)
+                else:
+                    next_q = self.target_net(next_states, next_extra_features).max(1)[0]
             else:
-                # Standard DQN
-                next_q = self.target_net(next_states).max(1)[0]
-            
+                if self.use_double_dqn:
+                    next_actions = self.policy_net(next_states).argmax(1)
+                    next_q = self.target_net(next_states).gather(1, next_actions.unsqueeze(1)).squeeze(1)
+                else:
+                    next_q = self.target_net(next_states).max(1)[0]
             target_q = rewards + self.gamma * next_q * (1 - dones)
-        
-        # Compute loss
         loss = self.criterion(current_q, target_q)
-        
-        # Optimize
         self.optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), max_norm=10.0)
         self.optimizer.step()
-        
-        # Update target network
         self.steps += 1
         if self.steps % self.target_update_freq == 0:
             self.target_net.load_state_dict(self.policy_net.state_dict())
-        
         return loss.item()
     
     def decay_epsilon(self):

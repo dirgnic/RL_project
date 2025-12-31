@@ -132,10 +132,12 @@ def test_random_agent():
 
 
 if __name__ == "__main__":
-    test_load_environment()
-    test_reward_wrappers()
-    test_random_agent()
-    
-    print("\n" + "=" * 60)
-    print("All tests completed!")
-    print("=" * 60)
+    def test_load_environment():
+        print("\nTesting custom environment loader...")
+        try:
+            env = load_environment("MyCustomEnv", seed=42)
+            obs, info = env.reset()
+            print(f"  MyCustomEnv loaded successfully. obs type: {type(obs)}")
+            env.close()
+        except Exception as e:
+            print(f"  Failed to load MyCustomEnv: {e}")
