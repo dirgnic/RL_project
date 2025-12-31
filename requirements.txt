@@ -9,10 +9,12 @@ torch==2.0.1
 tensorboard==2.13.0
 
 # Optional but recommended
+
 stable-baselines3==2.1.0
 pillow==10.0.0
 seaborn==0.12.2
 tqdm==4.65.0
+highway-env
 
 # Development
 pytest==7.4.0

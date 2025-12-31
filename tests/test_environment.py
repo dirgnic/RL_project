@@ -29,6 +29,7 @@ def test_load_environment():
                 print(f"⚠ {env_name} skipped: Box2D not installed (install with: pip install 'gymnasium[box2d]')")
             else:
                 print(f"✗ {env_name} failed: {e}")
+        environments.append("highway-v0")
 
 
 def test_reward_wrappers():
@@ -86,6 +87,22 @@ def test_reward_wrappers():
     except Exception as e:
         if "Box2D" in str(e):
             print("\nLunarLander-v2: ⚠ Skipped (Box2D not installed)")
+        # HighwayEnv
+        try:
+            env = load_environment("highway-v0", seed=42)
+            reward_types = ["default"]
+            print("\nHighway-v0:")
+            for reward_type in reward_types:
+                try:
+                    wrapped_env = CustomRewardWrapper(env, reward_type=reward_type, env_name="highway-v0")
+                    state, _ = wrapped_env.reset()
+                    state, reward, terminated, truncated, _ = wrapped_env.step(0)
+                    print(f"  ✓ {reward_type}: reward = {reward:.4f}")
+                except Exception as e:
+                    print(f"  ✗ {reward_type}: {e}")
+            env.close()
+        except Exception as e:
+            print(f"✗ Highway-v0 failed: {e}")
 
 
 def test_random_agent():

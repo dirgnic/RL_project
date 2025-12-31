@@ -1,6 +1,13 @@
 """
-Train DQN on Taxi-v3
-Person C (Ingrid)
+COMPLETE DQN Training Script for Taxi-v3
+Person C (Ingrid) - DQN Engineer
+
+Features:
+- Multi-seed training
+- Evaluation tracking
+- Visualization
+- Hyperparameter experiments
+- Model checkpointing
 
 Run with: python agents/dqn/train.py
 """
@@ -8,9 +15,19 @@ Run with: python agents/dqn/train.py
 import gymnasium as gym
 import numpy as np
 import torch
-from agents.dqn.agent import DQNAgent
 import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import json
+import os
+from datetime import datetime
 from collections import deque
+from typing import List, Dict, Tuple
+from agents.dqn.agent import DQNAgent
+
+# Set plotting style
+sns.set_style("whitegrid")
+plt.rcParams['figure.figsize'] = (12, 6)
 
 
 def train_dqn(
