@@ -1,4 +1,3 @@
-import gymnasium as gym
 from env import load_environment
 
 # Create the environment with human rendering

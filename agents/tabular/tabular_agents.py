@@ -2,7 +2,9 @@
 # (Stub for Person B)
 
 import numpy as np
-from env import load_environment
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from custom_env import MyCustomEnv
 
 
 class TabularQAgent:
@@ -24,7 +26,8 @@ class TabularQAgent:
     def select_action(self, state_disc):
         if np.random.rand() < self.epsilon:
             return np.random.randint(self.action_size)
-        return np.argmax(self.q_table[state_disc])
+        action = np.argmax(self.q_table[state_disc])
+        return int(action) % self.action_size
 
     def update(self, state_disc, action, reward, next_state_disc, done):
         best_next = np.max(self.q_table[next_state_disc])
@@ -41,7 +44,7 @@ class SarsaAgent:
 
 
 if __name__ == "__main__":
-    env = load_environment("MyCustomEnv")
+    env = MyCustomEnv(render_mode=None)
     obs, _ = env.reset()
     obs = np.asarray(obs)
     obs_low = np.min(obs) * np.ones_like(obs)
@@ -58,7 +61,8 @@ if __name__ == "__main__":
         done = False
         while not done:
             action = agent.select_action(state_disc)
-            next_obs, reward, terminated, truncated, _ = env.step(action)
+            action_vec = [action, 0.0]
+            next_obs, reward, terminated, truncated, _ = env.step(action_vec)
             next_obs = np.asarray(next_obs)
             next_state_disc = agent.discretize(next_obs, obs_low, obs_high)
             done = terminated or truncated

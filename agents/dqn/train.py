@@ -12,17 +12,16 @@ Features:
 Run with: python agents/dqn/train.py
 """
 
-from env import load_environment
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from custom_env import MyCustomEnv
+import gymnasium as gym
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
 import seaborn as sns
-import pandas as pd
-import json
 import os
-from datetime import datetime
 from collections import deque
-from typing import List, Dict, Tuple
 from agents.dqn.agent import DQNAgent
 
 # Set plotting style
@@ -31,7 +30,7 @@ plt.rcParams['figure.figsize'] = (12, 6)
 
 
 def train_dqn(
-    env_name='MyCustomEnv',
+    env=None,
     num_episodes=2000,
     max_steps=200,
     learning_rate=1e-3,
@@ -64,12 +63,13 @@ def train_dqn(
     torch.manual_seed(seed)
     
     # Create environment
-    env = load_environment(env_name)
+    if env is None:
+        env = MyCustomEnv(render_mode=None)
     obs, _ = env.reset(seed=seed)
     # Assume obs is np.ndarray with extra features at the end
     state_size = obs.shape[0]
     action_size = env.action_space.shape[0] if hasattr(env.action_space, 'shape') else env.action_space.n
-    print(f"Environment: {env_name}")
+    print(f"Environment: {env.__class__.__name__}")
     print(f"State space: {state_size}")
     print(f"Action space: {action_size}")
     print(f"Device: {'GPU' if torch.cuda.is_available() else 'CPU'}")
@@ -102,7 +102,8 @@ def train_dqn(
         for step in range(max_steps):
             # Select action
             action = agent.select_action(state, training=True)
-            # Take action
+            if not isinstance(action, (list, np.ndarray)):
+                action = [action, 0.0]
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
             # Store transition
@@ -188,17 +189,19 @@ def evaluate_agent(agent, env_name='Taxi-v3', num_episodes=100, seed=42):
     for episode in range(num_episodes):
         state, _ = env.reset()
         episode_reward = 0
-        
         for _ in range(200):
-            action = agent.select_action(state, training=False)  # Greedy
+            # Ensure state is float32 numpy array for DQN
+            if isinstance(state, np.ndarray):
+                state_eval = state.astype(np.float32)
+            else:
+                state_eval = np.array(state, dtype=np.float32)
+            action = agent.select_action(state_eval, training=False)  # Greedy
             state, reward, terminated, truncated, _ = env.step(action)
             episode_reward += reward
-            
             if terminated or truncated:
                 if reward == 20:  # Successful delivery
                     successes += 1
                 break
-        
         episode_rewards.append(episode_reward)
     
     env.close()
@@ -222,7 +225,7 @@ if __name__ == "__main__":
     
     # Train agent
     agent, rewards, losses = train_dqn(
-        num_episodes=2000,
+        num_episodes=200,  # Increased for better learning
         learning_rate=1e-3,
         seed=42
     )
@@ -237,7 +240,7 @@ if __name__ == "__main__":
     agent.save('dqn_taxi_model.pth')
     print("\nModel saved to dqn_taxi_model.pth")
     
-    print("\n✅ Training complete!")
+    print("\nTraining complete!")
     
     # TODO for Ingrid:
     # 1. Run this script and observe training

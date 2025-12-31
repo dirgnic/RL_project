@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-from typing import Tuple, Optional
+from typing import Optional
 from .network import DQNNetwork
 from .replay_buffer import ReplayBuffer
 
@@ -85,17 +85,18 @@ class DQNAgent:
         # Networks
         if hidden_dims is None:
             hidden_dims = [128, 64]
-            
+        # If state_size is 5x5 grid flattened, set obs_dim=25
+        obs_dim = state_size if state_size != 5 else 25
         self.policy_net = DQNNetwork(
-            state_size, action_size, embedding_dim, hidden_dims,
-            use_one_hot=use_one_hot, extra_feature_dim=extra_feature_dim
+            obs_dim=obs_dim,
+            action_size=action_size,
+            hidden_dims=hidden_dims
         ).to(self.device)
         self.target_net = DQNNetwork(
-            state_size, action_size, embedding_dim, hidden_dims,
-            use_one_hot=use_one_hot, extra_feature_dim=extra_feature_dim
+            obs_dim=obs_dim,
+            action_size=action_size,
+            hidden_dims=hidden_dims
         ).to(self.device)
-        self.use_one_hot = use_one_hot
-        self.extra_feature_dim = extra_feature_dim
         
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
@@ -113,51 +114,75 @@ class DQNAgent:
         self.steps = 0
         self.episodes = 0
     
-    def select_action(self, state: int, extra_features: np.ndarray = None, training: bool = True) -> int:
-        """
-        Select action using epsilon-greedy policy
-        
-        Args:
-            state: Current state
-            training: Whether in training mode
-            
-        Returns:
-            action: Selected action
-        """
+    def discretize_state(self, state, obs_low, obs_high, obs_bins):
+        # Discretize continuous state for Q-table or embedding
+        ratios = (state - obs_low) / (obs_high - obs_low)
+        ratios = np.clip(ratios, 0, 0.999)
+        return tuple((ratios * np.array(obs_bins)).astype(int))
+
+    def select_action(self, state, training=True):
+        # Always flatten and pad/truncate state to match obs_dim
+        if isinstance(state, np.ndarray):
+            state_flat = state.flatten()
+        else:
+            state_flat = np.array(state, dtype=np.float32).flatten()
+        # Pad or truncate to obs_dim
+        obs_dim = self.policy_net.obs_dim
+        if state_flat.shape[0] < obs_dim:
+            # Pad with zeros
+            state_flat = np.pad(state_flat, (0, obs_dim - state_flat.shape[0]), 'constant')
+        elif state_flat.shape[0] > obs_dim:
+            state_flat = state_flat[:obs_dim]
+        state_tensor = torch.tensor(state_flat, dtype=torch.float32, device=self.device).unsqueeze(0)
         if training and np.random.rand() < self.epsilon:
-            return np.random.randint(self.action_size)
-        with torch.no_grad():
-            state_tensor = torch.tensor([state], dtype=torch.long, device=self.device)
-            if self.extra_feature_dim > 0 and extra_features is not None:
-                extra_tensor = torch.tensor([extra_features], dtype=torch.float32, device=self.device)
-                q_values = self.policy_net(state_tensor, extra_tensor)
-            else:
+            action = np.random.randint(self.action_size)
+        else:
+            with torch.no_grad():
                 q_values = self.policy_net(state_tensor)
-            return q_values.argmax().item()
+                action = q_values.argmax().item()
+        # Ensure action is always in valid range
+        action = int(np.clip(action, 0, self.action_size - 1))
+        return action
     
-    def store_transition(
-        self, 
-        state: int, 
-        action: int, 
-        reward: float, 
-        next_state: int, 
-        done: bool
-    ):
-        """Store transition in replay buffer"""
+    def store_transition(self, state, action, reward, next_state, done):
+        # Flatten state and next_state if they are arrays
+        if isinstance(state, np.ndarray):
+            state = state.flatten()
+        if isinstance(next_state, np.ndarray):
+            next_state = next_state.flatten()
+        # If action is a vector, store only the discrete action index (first element)
+        if isinstance(action, (list, np.ndarray)):
+            action = int(action[0])
         self.memory.push(state, action, reward, next_state, done)
     
-    def train_step(self, extra_features_batch=None, next_extra_features_batch=None) -> Optional[float]:
-        """
-        Perform one training step
-        
-        Returns:
-            loss: Training loss or None if buffer not ready
-        """
+    def train_step(self) -> Optional[float]:
         if not self.memory.is_ready(self.batch_size):
             return None
-        
-        # Sample batch
         states, actions, rewards, next_states, dones = self.memory.sample(self.batch_size)
+        # Convert to tensors (support np.ndarray state)
+        if isinstance(states[0], np.ndarray):
+            states = torch.tensor(np.stack(states), dtype=torch.float32, device=self.device)
+            next_states = torch.tensor(np.stack(next_states), dtype=torch.float32, device=self.device)
+        else:
+            states = torch.tensor(states, dtype=torch.long, device=self.device)
+            next_states = torch.tensor(next_states, dtype=torch.long, device=self.device)
+        actions = torch.tensor(actions, dtype=torch.long, device=self.device)
+        rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)
+        dones = torch.tensor(dones, dtype=torch.float32, device=self.device)
+        # Q-values
+        q_values = self.policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
+        with torch.no_grad():
+            next_q_values = self.target_net(next_states).max(1)[0]
+        td_target = rewards + self.gamma * next_q_values * (1 - dones)
+        loss = self.criterion(q_values, td_target)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        self.steps += 1
+        # Target network update
+        if self.steps % self.target_update_freq == 0:
+            self.target_net.load_state_dict(self.policy_net.state_dict())
+        return loss.item()
         states = torch.tensor(states, dtype=torch.long, device=self.device)
         actions = torch.tensor(actions, dtype=torch.long, device=self.device)
         rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)

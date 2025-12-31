@@ -1,7 +1,8 @@
-# DQN Implementation for Taxi-v3
+
+# DQN Implementation for Taxi-v3 (Upgraded)
 **Person C (Ingrid) - DQN Engineer**
 
-Complete Deep Q-Network implementation with experiments and visualizations.
+Complete Deep Q-Network implementation for the upgraded Taxi-v3 environment (continuous state, extra features: fuel, passengers, traffic).
 
 ---
 
@@ -13,7 +14,7 @@ agents/dqn/
 ├── network.py            # Neural network architectures (DQN, Dueling DQN)
 ├── replay_buffer.py      # Experience replay (basic, prioritized)
 ├── agent.py              # Complete DQN agent with Double DQN
-├── train.py              # Training script
+├── train.py              # Training script (supports upgraded Taxi)
 ├── experiments.py        # Hyperparameter experiments
 ├── visualize.py          # Plotting and visualization utilities
 ├── requirements.txt      # Python dependencies
@@ -36,40 +37,38 @@ Or install from workspace root:
 pip install gymnasium numpy torch matplotlib pandas seaborn tensorboard
 ```
 
-### 2. Run Basic Training
+### 2. Run Basic Training (Upgraded Taxi)
 
 ```python
 from agents.dqn import DQNAgent
-import gymnasium as gym
+from env import load_environment
 
-# Create environment and agent
-env = gym.make('Taxi-v3')
+# Create upgraded Taxi environment and agent
+env = load_environment('MyCustomEnv')
+obs, _ = env.reset()
+state_size = len(obs)
+action_size = env.action_space.shape[0] if hasattr(env.action_space, 'shape') else env.action_space.n
 agent = DQNAgent(
-    state_size=500,  # Taxi-v3 has 500 discrete states
-    action_size=6,   # 6 actions
-    use_double_dqn=True  # Enable Double DQN
+  state_size=state_size,
+  action_size=action_size,
+  use_double_dqn=True
 )
 
 # Training loop
 for episode in range(2000):
-    state, _ = env.reset()
-    episode_reward = 0
-    
-    for step in range(200):
-        action = agent.select_action(state, training=True)
-        next_state, reward, terminated, truncated, _ = env.step(action)
-        
-        agent.store_transition(state, action, reward, next_state, terminated or truncated)
-        agent.train_step()
-        
-        episode_reward += reward
-        state = next_state
-        
-        if terminated or truncated:
-            break
-    
-    agent.decay_epsilon()
-    print(f"Episode {episode+1}, Reward: {episode_reward}")
+  state, _ = env.reset()
+  episode_reward = 0
+  for step in range(200):
+    action = agent.select_action(state, training=True)
+    next_state, reward, terminated, truncated, _ = env.step(action)
+    agent.store_transition(state, action, reward, next_state, terminated or truncated)
+    agent.train_step()
+    episode_reward += reward
+    state = next_state
+    if terminated or truncated:
+      break
+  agent.decay_epsilon()
+  print(f"Episode {episode+1}, Reward: {episode_reward}")
 ```
 
 ### 3. Run Experiments
@@ -152,7 +151,7 @@ viz.plot_comparison([exp1, exp2, exp3], title="Config Comparison")
 ```
 
 Creates:
-- Side-by-side bar plot with error bars
+- Side-by-side bar plot dded env"with error bars
 - Training curves overlay (all experiments)
 
 ### DQN vs Q-Learning

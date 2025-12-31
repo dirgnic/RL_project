@@ -1,9 +1,8 @@
-import gymnasium as gym
 import numpy as np
 import pygame
 from highway_env.envs.common.abstract import AbstractEnv
 from highway_env.road.road import Road, RoadNetwork
-from highway_env.road.lane import StraightLane, SineLane, CircularLane, LineType
+from highway_env.road.lane import StraightLane, CircularLane, LineType
 from highway_env.vehicle.kinematics import Vehicle
 from highway_env.vehicle.behavior import IDMVehicle
 class MyCustomEnv(AbstractEnv):
@@ -225,11 +224,16 @@ class MyCustomEnv(AbstractEnv):
             vehicle = IDMVehicle(self.road, position=[np.random.randint(0, 100), np.random.randint(0, 100)], speed=np.random.randint(3, 7))
             vehicle.lane_index = self.road.network.get_closest_lane_index(vehicle.position)
             self.road.vehicles.append(vehicle)
+        # Restore specific obstacles and route planning
+        obstacle = IDMVehicle(self.road, position=[20, 20], speed=2)
+        obstacle2 = IDMVehicle(self.road, position=[80, 80], speed=2)
+        obstacle3 = IDMVehicle(self.road, position=[50, 50], speed=2)
         path = self.road.network.shortest_path("b0", "c0")
         obstacle3.plan_route_to("c0")
         self.road.vehicles.append(obstacle)
         self.road.vehicles.append(obstacle2)
         self.road.vehicles.append(obstacle3)
+        # ...existing code...
     def _reward(self, action):
         # Taxi-v3 upgrades: reward for pickups, dropoffs, penalties for fuel, traffic, etc.
         reward = 0.0
@@ -270,7 +274,6 @@ class MyCustomEnv(AbstractEnv):
         self.current_step += 1
         return self.current_step >= self.max_steps
 # 1. Instantiate the environment
-import time
 # 1. Instantiate the environment class directly
 env = MyCustomEnv(render_mode='human') 
 

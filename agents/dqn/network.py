@@ -1,3 +1,4 @@
+import numpy as np
 """
 DQN Network Architecture for Taxi-v3
 
@@ -7,7 +8,6 @@ For Taxi-v3: 500 possible states → 6 actions
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class DQNNetwork(nn.Module):
@@ -24,19 +24,11 @@ class DQNNetwork(nn.Module):
         hidden_dims: List of hidden layer sizes (default: [128, 64])
     """
     
-    def __init__(self, state_size=500, action_size=6, embedding_dim=64, hidden_dims=[128, 64],
-                 use_one_hot=False, extra_feature_dim=0):
+    def __init__(self, obs_dim=5, action_size=2, hidden_dims=[128, 64]):
         super(DQNNetwork, self).__init__()
-        self.state_size = state_size
+        self.obs_dim = obs_dim
         self.action_size = action_size
-        self.use_one_hot = use_one_hot
-        self.extra_feature_dim = extra_feature_dim
-        if use_one_hot:
-            input_dim = state_size + extra_feature_dim
-        else:
-            self.embedding = nn.Embedding(state_size, embedding_dim)
-            input_dim = embedding_dim + extra_feature_dim
-        # Build hidden layers
+        input_dim = obs_dim
         layers = []
         for hidden_dim in hidden_dims:
             layers.append(nn.Linear(input_dim, hidden_dim))
@@ -45,25 +37,15 @@ class DQNNetwork(nn.Module):
         self.hidden = nn.Sequential(*layers)
         self.output = nn.Linear(hidden_dims[-1], action_size)
 
-    def forward(self, state, extra_features=None):
-        """
-        Forward pass
-        Args:
-            state: Tensor of shape (batch_size,) containing state indices (int) or one-hot (if use_one_hot)
-            extra_features: Optional tensor of shape (batch_size, extra_feature_dim)
-        Returns:
-            q_values: Tensor of shape (batch_size, action_size)
-        """
-        if self.use_one_hot:
-            # Convert state indices to one-hot
-            x = F.one_hot(state, num_classes=self.state_size).float()
-        else:
-            x = self.embedding(state)
-        if self.extra_feature_dim > 0 and extra_features is not None:
-            x = torch.cat([x, extra_features], dim=-1)
+    def forward(self, state):
+        # Accepts continuous state (batch_size, obs_dim) or (obs_dim,)
+        if isinstance(state, np.ndarray):
+            state = torch.tensor(state, dtype=torch.float32)
+        if len(state.shape) == 1:
+            state = state.unsqueeze(0)
+        x = state
         x = self.hidden(x)
-        q_values = self.output(x)
-        return q_values
+        return self.output(x)
 
 
 class DuelingDQNNetwork(nn.Module):
