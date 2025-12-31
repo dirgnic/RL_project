@@ -10,39 +10,41 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+
+# Discrete policy for MyCustomEnv (Taxi-like)
 class PolicyNetwork(nn.Module):
     def __init__(self, obs_dim, action_dim, hidden_dim=64):
         super().__init__()
-        self.mean_layer = nn.Sequential(
+        self.net = nn.Sequential(
             nn.Linear(obs_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, action_dim)
         )
-        self.log_std = nn.Parameter(torch.zeros(action_dim))
-        self.action_dim = action_dim
     def forward(self, x):
-        mean = self.mean_layer(x)
-        # Ensure mean is always shape (batch_size, 1)
-        if mean.dim() == 2 and mean.shape[1] > 1:
-            mean = mean[:, 0].unsqueeze(1)
-        std = torch.exp(self.log_std)
-        if std.dim() == 1 and std.shape[0] > 1:
-            std = std[0].unsqueeze(0)
-        return mean, std
+        logits = self.net(x)
+        return logits
+
 
 class REINFORCEAgent:
     def __init__(self, obs_dim, action_dim, lr=1e-2, gamma=0.99):
         self.gamma = gamma
         self.policy = PolicyNetwork(obs_dim, action_dim)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
+
     def select_action(self, obs):
-        obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
-        mean, std = self.policy(obs_tensor)
-        dist = torch.distributions.Normal(mean, std)
-        action = dist.sample()
-        log_prob = dist.log_prob(action)
-        # Use first value if output is a vector
-        return action.view(-1)[0].item(), log_prob.view(-1)[0]
+        obs_tensor = torch.tensor(obs, dtype=torch.float32)
+        if obs_tensor.dim() > 1:
+            obs_tensor = obs_tensor.flatten().unsqueeze(0)
+        elif obs_tensor.dim() == 1:
+            obs_tensor = obs_tensor.unsqueeze(0)
+        logits = self.policy(obs_tensor)
+        logits = logits.view(-1)  # ensure shape (action_dim,)
+        assert logits.dim() == 1, f"logits shape should be 1D, got {logits.shape}"
+        dist = torch.distributions.Categorical(logits=logits)
+        action = dist.sample()  # shape: ()
+        log_prob = dist.log_prob(action)  # shape: ()
+        return int(action.item()), float(log_prob.item())
+
     def update(self, trajectory):
         # trajectory: list of (log_prob, reward)
         returns = []
@@ -63,10 +65,16 @@ if __name__ == "__main__":
     env = MyCustomEnv(render_mode=None)
     obs, _ = env.reset()
     obs_dim = len(obs)
-    # Force action_dim = 1 for continuous action environments
-    action_dim = 1
+    action_dim = 5  # 5 discrete actions for mapping
     agent = REINFORCEAgent(obs_dim, action_dim)
     episodes = 200
+    action_map = [
+        [0.1, 0.0],    # accelerate
+        [-0.05, 0.0],  # brake
+        [0.0, -0.5],   # left
+        [0.0, 0.5],    # right
+        [0.0, 0.0]     # no-op
+    ]
     for ep in range(episodes):
         obs, _ = env.reset()
         done = False
@@ -74,7 +82,7 @@ if __name__ == "__main__":
         total_reward = 0
         while not done:
             action, log_prob = agent.select_action(obs)
-            action_vec = [action, 0.0]
+            action_vec = action_map[int(action) % len(action_map)]
             next_obs, reward, terminated, truncated, _ = env.step(action_vec)
             trajectory.append((log_prob, reward))
             obs = next_obs

@@ -46,32 +46,53 @@ def evaluate_dqn_agent(agent, env, episodes=10):
         rewards.append(total_reward)
     return rewards
 
+env = MyCustomEnv(render_mode=None)
+
+# Load agents (assume trained and saved, or use fresh for demo)
+
+# For MyCustomEnv, use 5 discrete actions for REINFORCE (see mapping in evaluate_policy_agent)
+action_size = env.action_space.shape[0] if hasattr(env.action_space, 'shape') else env.action_space.n
+tabular_agent = TabularQAgent([10]*len(env.reset()[0]), action_size)
+dqn_agent = DQNAgent(state_size=len(env.reset()[0]), action_size=action_size)
+obs_dim = np.prod(env.reset()[0].shape)
+print(f"[DEBUG] obs_dim for REINFORCEAgent: {obs_dim}")
+action_dim = 5  # 5 discrete actions for mapping
+policy_agent = REINFORCEAgent(obs_dim, action_dim)
+
+
 def evaluate_policy_agent(agent, env, episodes=10):
     rewards = []
     for ep in range(episodes):
         obs, _ = env.reset()
+        print(f"[DEBUG] obs shape at episode {ep}: {np.shape(obs)}")
         done = False
         total_reward = 0
         while not done:
-            action, _ = agent.select_action(obs)
-            # Ensure action is a vector for continuous action space
-            if not isinstance(action, (list, np.ndarray)):
+            flat_obs = np.array(obs).flatten()
+            action, _ = agent.select_action(flat_obs)
+            # For MyCustomEnv, map discrete action to [acceleration, steering]
+            if hasattr(env, 'action_space') and hasattr(env.action_space, 'shape') and env.action_space.shape == (2,):
+                # Example: 5 discrete actions mapped to 2D continuous
+                # 0: [0.1, 0.0] (accelerate)
+                # 1: [-0.05, 0.0] (brake)
+                # 2: [0.0, -0.5] (left)
+                # 3: [0.0, 0.5] (right)
+                # 4: [0.0, 0.0] (no-op)
+                action_map = [
+                    [0.1, 0.0],    # accelerate
+                    [-0.05, 0.0],  # brake
+                    [0.0, -0.5],   # left
+                    [0.0, 0.5],    # right
+                    [0.0, 0.0]     # no-op
+                ]
+                action = action_map[int(action) % len(action_map)]
+            elif not isinstance(action, (list, np.ndarray)):
                 action = [action] * (env.action_space.shape[0] if hasattr(env.action_space, 'shape') else 1)
             obs, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
             total_reward += reward
         rewards.append(total_reward)
     return rewards
-
-env = MyCustomEnv(render_mode=None)
-
-# Load agents (assume trained and saved, or use fresh for demo)
-
-action_size = env.action_space.shape[0] if hasattr(env.action_space, 'shape') else env.action_space.n
-tabular_agent = TabularQAgent([10]*len(env.reset()[0]), action_size)
-dqn_agent = DQNAgent(state_size=len(env.reset()[0]), action_size=action_size)
-policy_agent = REINFORCEAgent(len(env.reset()[0]), action_size)
-
 
 EVAL_EPISODES = 20
 results = {}
