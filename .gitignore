@@ -38,6 +38,10 @@ MANIFEST
 
 # OS
 .DS_Store
+Laboratoare/
+Cursuri/
+PROIECT_ECHIPA/
+docs/
 Thumbs.db
 
 # Logs & Results (optional)
