@@ -10,17 +10,127 @@ import torch
 import torch.nn as nn
 
 
+def decode_taxi_state(state):
+    """
+    Decode Taxi-v3 state integer into meaningful features.
+    
+    State encoding: ((taxi_row * 5 + taxi_col) * 5 + pass_loc) * 4 + dest
+    
+    Returns: [taxi_row, taxi_col, pass_loc, dest] normalized to [0, 1]
+    """
+    if isinstance(state, torch.Tensor):
+        state = state.long()
+        dest = state % 4
+        state = state // 4
+        pass_loc = state % 5
+        state = state // 5
+        taxi_col = state % 5
+        taxi_row = state // 5
+        # Normalize to [0, 1]
+        features = torch.stack([
+            taxi_row.float() / 4.0,
+            taxi_col.float() / 4.0,
+            pass_loc.float() / 4.0,
+            dest.float() / 3.0
+        ], dim=-1)
+    else:
+        # Numpy/int version
+        state = int(state)
+        dest = state % 4
+        state = state // 4
+        pass_loc = state % 5
+        state = state // 5
+        taxi_col = state % 5
+        taxi_row = state // 5
+        features = np.array([
+            taxi_row / 4.0,
+            taxi_col / 4.0,
+            pass_loc / 4.0,
+            dest / 3.0
+        ], dtype=np.float32)
+    return features
+
+
+class TaxiDQNNetwork(nn.Module):
+    """
+    DQN Network specifically designed for Taxi-v3.
+    
+    Instead of using embeddings, this decodes the state integer into
+    meaningful features (taxi position, passenger location, destination)
+    and uses a simple MLP to predict Q-values.
+    
+    This is more sample-efficient for Taxi-v3's small state space.
+    """
+    
+    def __init__(self, state_size=500, action_size=6, hidden_dims=[64, 64]):
+        super(TaxiDQNNetwork, self).__init__()
+        self.state_size = state_size
+        self.action_size = action_size
+        self.obs_dim = state_size  # For compatibility with agent
+        
+        # Input: 4 decoded features (taxi_row, taxi_col, pass_loc, dest)
+        input_dim = 4
+        
+        layers = []
+        for hidden_dim in hidden_dims:
+            layers.append(nn.Linear(input_dim, hidden_dim))
+            layers.append(nn.ReLU())
+            input_dim = hidden_dim
+        
+        self.hidden = nn.Sequential(*layers)
+        self.output = nn.Linear(hidden_dims[-1], action_size)
+        
+        # Initialize weights
+        self._init_weights()
+    
+    def _init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.constant_(m.bias, 0)
+    
+    def forward(self, state):
+        """
+        Forward pass.
+        
+        Args:
+            state: Integer state indices, shape (batch_size,) or scalar
+        
+        Returns:
+            Q-values for all actions, shape (batch_size, action_size)
+        """
+        # Handle different input types
+        if isinstance(state, (int, np.integer)):
+            state = torch.tensor([state], dtype=torch.long)
+        elif isinstance(state, np.ndarray):
+            state = torch.tensor(state, dtype=torch.long)
+        elif isinstance(state, torch.Tensor):
+            state = state.long()
+        
+        # Ensure at least 1D
+        if state.dim() == 0:
+            state = state.unsqueeze(0)
+        
+        # Decode state into features
+        features = decode_taxi_state(state)
+        
+        # Forward through network
+        x = self.hidden(features)
+        q_values = self.output(x)
+        
+        return q_values
+
+
 class DQNNetwork(nn.Module):
     """
-    Deep Q-Network for discrete state space (Taxi-v3)
+    Deep Q-Network for continuous state spaces.
     
     Architecture:
-        State Index → Embedding → Hidden Layers → Q-values
+        State Vector → Hidden Layers → Q-values
     
     Args:
-        state_size: Number of possible states (500 for Taxi-v3)
-        action_size: Number of actions (6 for Taxi-v3)
-        embedding_dim: Size of state embedding (default: 64)
+        obs_dim: Dimension of observation/state vector
+        action_size: Number of actions
         hidden_dims: List of hidden layer sizes (default: [128, 64])
     """
     
@@ -41,6 +151,8 @@ class DQNNetwork(nn.Module):
         # Accepts continuous state (batch_size, obs_dim) or (obs_dim,)
         if isinstance(state, np.ndarray):
             state = torch.tensor(state, dtype=torch.float32)
+        elif isinstance(state, torch.Tensor):
+            state = state.to(torch.float32)
         if len(state.shape) == 1:
             state = state.unsqueeze(0)
         x = state
@@ -59,31 +171,25 @@ class DuelingDQNNetwork(nn.Module):
     
     def __init__(self, state_size=500, action_size=6, embedding_dim=64, hidden_dims=[128, 64]):
         super(DuelingDQNNetwork, self).__init__()
-        
         self.state_size = state_size
         self.action_size = action_size
-        
+        self.obs_dim = state_size  # Add obs_dim for agent compatibility
         # Shared embedding
         self.embedding = nn.Embedding(state_size, embedding_dim)
-        
         # Shared hidden layers
         layers = []
         input_dim = embedding_dim
-        
         for hidden_dim in hidden_dims:
             layers.append(nn.Linear(input_dim, hidden_dim))
             layers.append(nn.ReLU())
             input_dim = hidden_dim
-        
         self.shared = nn.Sequential(*layers)
-        
         # Value stream: V(s)
         self.value_stream = nn.Sequential(
             nn.Linear(hidden_dims[-1], 64),
             nn.ReLU(),
             nn.Linear(64, 1)
         )
-        
         # Advantage stream: A(s,a)
         self.advantage_stream = nn.Sequential(
             nn.Linear(hidden_dims[-1], 64),
@@ -94,24 +200,24 @@ class DuelingDQNNetwork(nn.Module):
     def forward(self, state):
         """
         Forward pass with dueling architecture
-        
         Args:
             state: Tensor of shape (batch_size,) containing state indices
-            
         Returns:
             q_values: Tensor of shape (batch_size, action_size)
         """
-        # Shared embedding and hidden layers
+        # Ensure state is tensor of type long for embedding
+        if isinstance(state, np.ndarray):
+            state = torch.tensor(state, dtype=torch.long)
+        elif isinstance(state, torch.Tensor):
+            state = state.to(torch.long)
+        # Only unsqueeze if scalar (single state), not for batch
+        if state.dim() == 0:
+            state = state.unsqueeze(0)
         x = self.embedding(state)
         x = self.shared(x)
-        
-        # Compute value and advantage
         value = self.value_stream(x)  # (batch_size, 1)
         advantage = self.advantage_stream(x)  # (batch_size, action_size)
-        
-        # Combine: Q(s,a) = V(s) + (A(s,a) - mean(A(s,·)))
         q_values = value + (advantage - advantage.mean(dim=1, keepdim=True))
-        
         return q_values
 
 

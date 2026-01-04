@@ -7,9 +7,18 @@ env = load_environment("MyCustomEnv")
 
 obs_dim = np.prod(env.reset()[0].shape)
 action_dim = env.action_space.shape[0] if hasattr(env.action_space, 'shape') else env.action_space.n
-agent = DQNAgent(state_size=obs_dim, action_size=action_dim)
 
-num_episodes = 200
+agent = DQNAgent(
+    state_size=obs_dim,
+    action_size=action_dim,
+    learning_rate=5e-4,         # Lower learning rate
+    epsilon_decay=0.997,        # Slower epsilon decay
+    buffer_capacity=20000,      # Larger replay buffer
+    batch_size=64,              # Batch size
+    use_double_dqn=True         # Enable Double DQN
+)
+
+num_episodes = 1000  # More episodes for deep RL
 for ep in range(num_episodes):
     obs, _ = env.reset()
     done = False
@@ -25,9 +34,9 @@ for ep in range(num_episodes):
         total_reward += reward
         done = terminated or truncated
     agent.decay_epsilon()
-    print(f"Episode {ep+1}: Reward {total_reward:.2f}, Epsilon {agent.epsilon:.3f}")
+    # print(f"Episode {ep+1}: Reward {total_reward:.2f}, Epsilon {agent.epsilon:.3f}")
 
 # Save the trained model
 agent.save("dqn_taxi_model.pth")
 
-print("Training complete. Model saved as dqn_taxi_model.pth.")
+# print("Training complete. Model saved as dqn_taxi_model.pth.")

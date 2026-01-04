@@ -27,7 +27,7 @@ class DQNVisualizer:
     def __init__(self, output_dir: str = './plots'):
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
-        print(f"📊 Visualizer initialized. Plots will be saved to: {output_dir}")
+        print(f"[INFO] Visualizer initialized. Plots will be saved to: {output_dir}")
     
     def plot_training_curves(
         self,
@@ -80,7 +80,7 @@ class DQNVisualizer:
         
         filepath = f"{self.output_dir}/{filename}"
         plt.savefig(filepath, dpi=300, bbox_inches='tight')
-        print(f"✅ Saved: {filepath}")
+        print(f"[OK] Saved: {filepath}")
         plt.close()
     
     def plot_comparison(
@@ -145,7 +145,7 @@ class DQNVisualizer:
         
         filepath = f"{self.output_dir}/{filename}"
         plt.savefig(filepath, dpi=300, bbox_inches='tight')
-        print(f"✅ Saved: {filepath}")
+        print(f"[OK] Saved: {filepath}")
         plt.close()
     
     def plot_dqn_vs_qlearning(
@@ -223,7 +223,7 @@ class DQNVisualizer:
         
         filepath = f"{self.output_dir}/{filename}"
         plt.savefig(filepath, dpi=300, bbox_inches='tight')
-        print(f"✅ Saved: {filepath}")
+        print(f"[OK] Saved: {filepath}")
         plt.close()
     
     def create_summary_table(
@@ -250,11 +250,11 @@ class DQNVisualizer:
         df = pd.DataFrame(data)
         filepath = f"{self.output_dir}/{filename}"
         df.to_csv(filepath, index=False, float_format='%.2f')
-        print(f"✅ Saved table: {filepath}")
+        print(f"[OK] Saved table: {filepath}")
         
         # Also print to console
         print("\n" + "="*80)
-        print("📊 RESULTS TABLE")
+        print("[INFO] RESULTS TABLE")
         print("="*80)
         print(df.to_string(index=False))
         print("="*80 + "\n")
@@ -267,13 +267,13 @@ def load_experiment_results(results_dir: str) -> Dict:
     results_path = Path(results_dir) / "results.json"
     
     if not results_path.exists():
-        print(f"❌ Results file not found: {results_path}")
+        print(f"[ERROR] Results file not found: {results_path}")
         return None
     
     with open(results_path, 'r') as f:
         results = json.load(f)
     
-    print(f"✅ Loaded results from: {results_path}")
+    print(f"[OK] Loaded results from: {results_path}")
     return results
 
 
@@ -285,10 +285,10 @@ def visualize_all_experiments(experiments_dir: str = './experiments'):
     exp_dirs = [d for d in Path(experiments_dir).iterdir() if d.is_dir() and d.name != 'plots']
     
     if not exp_dirs:
-        print("❌ No experiment directories found!")
+        print("[ERROR] No experiment directories found!")
         return
     
-    print(f"\n📂 Found {len(exp_dirs)} experiment directories\n")
+    print(f"\n[INFO] Found {len(exp_dirs)} experiment directories\n")
     
     all_experiments = []
     for exp_dir in exp_dirs:
@@ -314,13 +314,13 @@ def visualize_all_experiments(experiments_dir: str = './experiments'):
             filename="all_results_summary.csv"
         )
     
-    print("\n✅ All visualizations complete!")
-    print(f"📁 Check plots in: {viz.output_dir}")
+    print("\n[OK] All visualizations complete!")
+    print(f"[INFO] Check plots in: {viz.output_dir}")
 
 
 if __name__ == "__main__":
     print("\n" + "="*60)
-    print("📊 DQN VISUALIZATION UTILITIES")
+    print("[INFO] DQN VISUALIZATION UTILITIES")
     print("Person C (Ingrid)")
     print("="*60 + "\n")
     
@@ -335,4 +335,4 @@ if __name__ == "__main__":
     if Path('./experiments').exists():
         visualize_all_experiments('./experiments')
     else:
-        print("💡 Run experiments first using experiments.py!")
+        print("[TIP] Run experiments first using experiments.py!")

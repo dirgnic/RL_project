@@ -20,15 +20,15 @@ def test_load_environment():
     for env_name in environments:
         try:
             env = load_environment(env_name, seed=42)
-            print(f"✓ {env_name} loaded successfully")
+            print(f"[OK] {env_name} loaded successfully")
             print(f"  Observation space: {env.observation_space}")
             print(f"  Action space: {env.action_space}")
             env.close()
         except Exception as e:
             if "Box2D" in str(e):
-                print(f"⚠ {env_name} skipped: Box2D not installed (install with: pip install 'gymnasium[box2d]')")
+                print(f"[WARN] {env_name} skipped: Box2D not installed (install with: pip install 'gymnasium[box2d]')")
             else:
-                print(f"✗ {env_name} failed: {e}")
+                print(f"[ERROR] {env_name} failed: {e}")
         environments.append("highway-v0")
 
 
@@ -46,9 +46,9 @@ def test_reward_wrappers():
             wrapped_env = CustomRewardWrapper(env, reward_type=reward_type, env_name="CartPole-v1")
             state, _ = wrapped_env.reset()
             state, reward, terminated, truncated, _ = wrapped_env.step(0)
-            print(f"  ✓ {reward_type}: reward = {reward:.4f}")
+            print(f"  [OK] {reward_type}: reward = {reward:.4f}")
         except Exception as e:
-            print(f"  ✗ {reward_type}: {e}")
+            print(f"  [ERROR] {reward_type}: {e}")
     
     env.close()
     
@@ -62,9 +62,9 @@ def test_reward_wrappers():
             wrapped_env = CustomRewardWrapper(env, reward_type=reward_type, env_name="MountainCar-v0")
             state, _ = wrapped_env.reset()
             state, reward, terminated, truncated, _ = wrapped_env.step(0)
-            print(f"  ✓ {reward_type}: reward = {reward:.4f}")
+            print(f"  [OK] {reward_type}: reward = {reward:.4f}")
         except Exception as e:
-            print(f"  ✗ {reward_type}: {e}")
+            print(f"  [ERROR] {reward_type}: {e}")
     
     env.close()
     
@@ -79,14 +79,14 @@ def test_reward_wrappers():
                 wrapped_env = CustomRewardWrapper(env, reward_type=reward_type, env_name="LunarLander-v2")
                 state, _ = wrapped_env.reset()
                 state, reward, terminated, truncated, _ = wrapped_env.step(0)
-                print(f"  ✓ {reward_type}: reward = {reward:.4f}")
+                print(f"  [OK] {reward_type}: reward = {reward:.4f}")
             except Exception as e:
-                print(f"  ✗ {reward_type}: {e}")
+                print(f"  [ERROR] {reward_type}: {e}")
         
         env.close()
     except Exception as e:
         if "Box2D" in str(e):
-            print("\nLunarLander-v2: ⚠ Skipped (Box2D not installed)")
+            print("\nLunarLander-v2: [WARN] Skipped (Box2D not installed)")
         # HighwayEnv
         try:
             env = load_environment("highway-v0", seed=42)
@@ -97,12 +97,12 @@ def test_reward_wrappers():
                     wrapped_env = CustomRewardWrapper(env, reward_type=reward_type, env_name="highway-v0")
                     state, _ = wrapped_env.reset()
                     state, reward, terminated, truncated, _ = wrapped_env.step(0)
-                    print(f"  ✓ {reward_type}: reward = {reward:.4f}")
+                    print(f"  [OK] {reward_type}: reward = {reward:.4f}")
                 except Exception as e:
-                    print(f"  ✗ {reward_type}: {e}")
+                    print(f"  [ERROR] {reward_type}: {e}")
             env.close()
         except Exception as e:
-            print(f"✗ Highway-v0 failed: {e}")
+            print(f"[ERROR] Highway-v0 failed: {e}")
 
 
 def test_random_agent():

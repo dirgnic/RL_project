@@ -55,7 +55,7 @@ action_size = env.action_space.shape[0] if hasattr(env.action_space, 'shape') el
 tabular_agent = TabularQAgent([10]*len(env.reset()[0]), action_size)
 dqn_agent = DQNAgent(state_size=len(env.reset()[0]), action_size=action_size)
 obs_dim = np.prod(env.reset()[0].shape)
-print(f"[DEBUG] obs_dim for REINFORCEAgent: {obs_dim}")
+
 action_dim = 5  # 5 discrete actions for mapping
 policy_agent = REINFORCEAgent(obs_dim, action_dim)
 
@@ -64,7 +64,7 @@ def evaluate_policy_agent(agent, env, episodes=10):
     rewards = []
     for ep in range(episodes):
         obs, _ = env.reset()
-        print(f"[DEBUG] obs shape at episode {ep}: {np.shape(obs)}")
+
         done = False
         total_reward = 0
         while not done:
@@ -100,9 +100,7 @@ results['TabularQ'] = evaluate_tabular_agent(tabular_agent, env, episodes=EVAL_E
 results['DQN'] = evaluate_dqn_agent(dqn_agent, env, episodes=EVAL_EPISODES)
 results['REINFORCE'] = evaluate_policy_agent(policy_agent, env, episodes=EVAL_EPISODES)
 
-print(f"TabularQ type: {type(results['TabularQ'])}, len: {len(results['TabularQ']) if hasattr(results['TabularQ'], '__len__') else 'N/A'}")
-print(f"DQN type: {type(results['DQN'])}, len: {len(results['DQN']) if hasattr(results['DQN'], '__len__') else 'N/A'}")
-print(f"REINFORCE type: {type(results['REINFORCE'])}, len: {len(results['REINFORCE']) if hasattr(results['REINFORCE'], '__len__') else 'N/A'}")
+
 
 # Ensure all results are the same length for DataFrame
 min_len = min(len(results['TabularQ']), len(results['DQN']), len(results['REINFORCE']))
@@ -110,4 +108,4 @@ results = {k: v[:min_len] for k, v in results.items()}
 
 results_df = pd.DataFrame(results)
 results_df.to_csv('evaluation_results.csv', index=False)
-print("Evaluation complete. Results saved to evaluation_results.csv.")
+

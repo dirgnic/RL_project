@@ -21,8 +21,8 @@ class DQNExperimentRunner:
     def __init__(self, base_output_dir: str = './experiments'):
         self.base_output_dir = base_output_dir
         os.makedirs(base_output_dir, exist_ok=True)
-        print(f"📊 Experiment Runner Initialized")
-        print(f"📁 Output directory: {base_output_dir}\n")
+        print(f"Experiment Runner Initialized")
+        print(f"Output directory: {base_output_dir}\n")
     
     def run_experiment(
         self,
@@ -44,7 +44,7 @@ class DQNExperimentRunner:
             results: Dict with all results
         """
         print(f"\n{'='*60}")
-        print(f"🚀 Running Experiment: {experiment_name}")
+        print(f"Running Experiment: {experiment_name}")
         print(f"{'='*60}")
         print(f"Config: {json.dumps(config, indent=2)}")
         print(f"Seeds: {num_seeds}, Episodes: {num_episodes}\n")
@@ -56,7 +56,7 @@ class DQNExperimentRunner:
         seeds = [42 + i * 111 for i in range(num_seeds)]
         
         for seed_idx, seed in enumerate(seeds):
-            print(f"🌱 Seed {seed} ({seed_idx+1}/{num_seeds})")
+            print(f"Seed {seed} ({seed_idx+1}/{num_seeds})")
             result = self._train_single(seed, config, num_episodes)
             all_results.append(result)
             print(f"   Final Reward: {result['final_reward']:.2f}\n")
@@ -77,9 +77,9 @@ class DQNExperimentRunner:
         with open(f"{exp_dir}/results.json", 'w') as f:
             json.dump(aggregated, f, indent=2, default=lambda x: x.tolist() if isinstance(x, np.ndarray) else x)
         
-        print(f"✅ Experiment Complete!")
-        print(f"   Mean Final Reward: {aggregated['mean_final_reward']:.2f} ± {aggregated['std_final_reward']:.2f}")
-        print(f"   Mean Best Reward: {aggregated['mean_best_reward']:.2f} ± {aggregated['std_best_reward']:.2f}")
+        print(f"Experiment Complete!")
+        print(f"   Mean Final Reward: {aggregated['mean_final_reward']:.2f} +/- {aggregated['std_final_reward']:.2f}")
+        print(f"   Mean Best Reward: {aggregated['mean_best_reward']:.2f} +/- {aggregated['std_best_reward']:.2f}")
         print(f"   Results saved to: {exp_dir}\n")
         
         return aggregated
@@ -92,11 +92,33 @@ class DQNExperimentRunner:
         env = gym.make('Taxi-v3')
         env.reset(seed=seed)
         
+        # Remove keys not accepted by DQNAgent
+        agent_config = dict(config)
+        agent_config.pop('max_steps', None)
+        
+        # Use TaxiDQNNetwork - designed specifically for Taxi-v3
+        # It decodes state integers into meaningful features (taxi pos, passenger, dest)
+        from agents.dqn.network import TaxiDQNNetwork
         agent = DQNAgent(
             state_size=env.observation_space.n,
             action_size=env.action_space.n,
-            **config
+            hidden_dims=[64, 64],
+            **agent_config
         )
+        # Replace networks with TaxiDQNNetwork for better performance
+        agent.policy_net = TaxiDQNNetwork(
+            state_size=env.observation_space.n,
+            action_size=env.action_space.n,
+            hidden_dims=[64, 64]
+        ).to(agent.device)
+        agent.target_net = TaxiDQNNetwork(
+            state_size=env.observation_space.n,
+            action_size=env.action_space.n,
+            hidden_dims=[64, 64]
+        ).to(agent.device)
+        agent.target_net.load_state_dict(agent.policy_net.state_dict())
+        # Re-initialize optimizer with new network parameters
+        agent.optimizer = torch.optim.Adam(agent.policy_net.parameters(), lr=config.get('learning_rate', 1e-3))
         
         rewards = []
         best_reward = -float('inf')
@@ -160,7 +182,7 @@ class DQNExperimentRunner:
             comparison_results: Dict with comparison metrics
         """
         print(f"\n{'='*60}")
-        print(f"🔬 HYPERPARAMETER COMPARISON")
+        print(f"HYPERPARAMETER COMPARISON")
         print(f"{'='*60}\n")
         
         all_experiments = []
@@ -171,7 +193,7 @@ class DQNExperimentRunner:
         
         # Print comparison table
         print(f"\n{'='*60}")
-        print("📊 COMPARISON RESULTS")
+        print("COMPARISON RESULTS")
         print(f"{'='*60}\n")
         print(f"{'Experiment':<30} {'Mean Reward':<15} {'Best Reward':<15}")
         print("-" * 60)
@@ -203,7 +225,7 @@ def run_baseline_experiment():
         'batch_size': 64,
         'target_update_freq': 100,
         'use_double_dqn': False,
-        'max_steps': 200
+        # 'max_steps': 200  # Not for DQNAgent
     }
     
     return runner.run_experiment('baseline_dqn', config, num_seeds=3, num_episodes=2000)
@@ -301,7 +323,7 @@ def run_double_dqn_comparison():
 
 if __name__ == "__main__":
     print("\n" + "="*60)
-    print("🧪 DQN EXPERIMENTS FOR TAXI-V3")
+    print("DQN EXPERIMENTS FOR TAXI-V3")
     print("Person C (Ingrid)")
     print("="*60 + "\n")
     
@@ -320,10 +342,10 @@ if __name__ == "__main__":
     elif choice == "3":
         run_double_dqn_comparison()
     elif choice == "4":
-        print("\n🚀 Running ALL experiments...\n")
+        print("\nRunning ALL experiments...\n")
         run_baseline_experiment()
         run_hyperparameter_sweep()
         run_double_dqn_comparison()
-        print("\n✅ All experiments complete!")
+        print("\nAll experiments complete!")
     else:
         print("Invalid choice!")

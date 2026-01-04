@@ -121,35 +121,45 @@ class DQNAgent:
         return tuple((ratios * np.array(obs_bins)).astype(int))
 
     def select_action(self, state, training=True):
-        # Always flatten and pad/truncate state to match obs_dim
-        if isinstance(state, np.ndarray):
+        # Handle discrete states (single integer) for Taxi-v3
+        if isinstance(state, (int, np.integer)):
+            # Discrete state: pass directly as tensor for embedding
+            state_tensor = torch.tensor([state], dtype=torch.long, device=self.device)
+        elif isinstance(state, np.ndarray) and state.ndim == 0:
+            # Scalar numpy array
+            state_tensor = torch.tensor([int(state)], dtype=torch.long, device=self.device)
+        elif isinstance(state, np.ndarray):
+            # Continuous state: flatten and convert to float
             state_flat = state.flatten()
+            state_tensor = torch.tensor(state_flat, dtype=torch.float32, device=self.device).unsqueeze(0)
         else:
-            state_flat = np.array(state, dtype=np.float32).flatten()
-        # Pad or truncate to obs_dim
-        obs_dim = self.policy_net.obs_dim
-        if state_flat.shape[0] < obs_dim:
-            # Pad with zeros
-            state_flat = np.pad(state_flat, (0, obs_dim - state_flat.shape[0]), 'constant')
-        elif state_flat.shape[0] > obs_dim:
-            state_flat = state_flat[:obs_dim]
-        state_tensor = torch.tensor(state_flat, dtype=torch.float32, device=self.device).unsqueeze(0)
+            # Fallback for other types
+            state_tensor = torch.tensor([int(state)], dtype=torch.long, device=self.device)
+        
         if training and np.random.rand() < self.epsilon:
             action = np.random.randint(self.action_size)
         else:
             with torch.no_grad():
                 q_values = self.policy_net(state_tensor)
+                if q_values.dim() == 3:
+                    q_values = q_values.squeeze(1)
                 action = q_values.argmax().item()
         # Ensure action is always in valid range
         action = int(np.clip(action, 0, self.action_size - 1))
         return action
     
     def store_transition(self, state, action, reward, next_state, done):
-        # Flatten state and next_state if they are arrays
+        # Store discrete states as integers, continuous as arrays
         if isinstance(state, np.ndarray):
-            state = state.flatten()
+            if state.ndim == 0:
+                state = int(state)
+            else:
+                state = state.flatten()
         if isinstance(next_state, np.ndarray):
-            next_state = next_state.flatten()
+            if next_state.ndim == 0:
+                next_state = int(next_state)
+            else:
+                next_state = next_state.flatten()
         # If action is a vector, store only the discrete action index (first element)
         if isinstance(action, (list, np.ndarray)):
             action = int(action[0])
@@ -167,12 +177,19 @@ class DQNAgent:
             states = torch.tensor(states, dtype=torch.long, device=self.device)
             next_states = torch.tensor(next_states, dtype=torch.long, device=self.device)
         actions = torch.tensor(actions, dtype=torch.long, device=self.device)
+        actions = actions.view(-1)  # Ensure actions is 1D for gather
         rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)
         dones = torch.tensor(dones, dtype=torch.float32, device=self.device)
-        # Q-values
-        q_values = self.policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
+        # Q-values (squeeze if 3D output from DuelingDQNNetwork)
+        q_out = self.policy_net(states)
+        if q_out.dim() == 3:
+            q_out = q_out.squeeze(1)
+        q_values = q_out.gather(1, actions.unsqueeze(1)).squeeze(1)
         with torch.no_grad():
-            next_q_values = self.target_net(next_states).max(1)[0]
+            next_q_out = self.target_net(next_states)
+            if next_q_out.dim() == 3:
+                next_q_out = next_q_out.squeeze(1)
+            next_q_values = next_q_out.max(1)[0]
         td_target = rewards + self.gamma * next_q_values * (1 - dones)
         loss = self.criterion(q_values, td_target)
         self.optimizer.zero_grad()
@@ -180,41 +197,6 @@ class DQNAgent:
         self.optimizer.step()
         self.steps += 1
         # Target network update
-        if self.steps % self.target_update_freq == 0:
-            self.target_net.load_state_dict(self.policy_net.state_dict())
-        return loss.item()
-        states = torch.tensor(states, dtype=torch.long, device=self.device)
-        actions = torch.tensor(actions, dtype=torch.long, device=self.device)
-        rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)
-        next_states = torch.tensor(next_states, dtype=torch.long, device=self.device)
-        dones = torch.tensor(dones, dtype=torch.float32, device=self.device)
-        # Handle extra features if provided
-        if self.extra_feature_dim > 0 and extra_features_batch is not None:
-            extra_features = torch.tensor(extra_features_batch, dtype=torch.float32, device=self.device)
-            current_q = self.policy_net(states, extra_features).gather(1, actions.unsqueeze(1)).squeeze(1)
-        else:
-            current_q = self.policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
-        with torch.no_grad():
-            if self.extra_feature_dim > 0 and next_extra_features_batch is not None:
-                next_extra_features = torch.tensor(next_extra_features_batch, dtype=torch.float32, device=self.device)
-                if self.use_double_dqn:
-                    next_actions = self.policy_net(next_states, next_extra_features).argmax(1)
-                    next_q = self.target_net(next_states, next_extra_features).gather(1, next_actions.unsqueeze(1)).squeeze(1)
-                else:
-                    next_q = self.target_net(next_states, next_extra_features).max(1)[0]
-            else:
-                if self.use_double_dqn:
-                    next_actions = self.policy_net(next_states).argmax(1)
-                    next_q = self.target_net(next_states).gather(1, next_actions.unsqueeze(1)).squeeze(1)
-                else:
-                    next_q = self.target_net(next_states).max(1)[0]
-            target_q = rewards + self.gamma * next_q * (1 - dones)
-        loss = self.criterion(current_q, target_q)
-        self.optimizer.zero_grad()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), max_norm=10.0)
-        self.optimizer.step()
-        self.steps += 1
         if self.steps % self.target_update_freq == 0:
             self.target_net.load_state_dict(self.policy_net.state_dict())
         return loss.item()
