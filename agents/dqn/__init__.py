@@ -1,12 +1,8 @@
-"""
-DQN Agent for Taxi-v3
-Person C (Ingrid) - Deep Value-Based RL
-
-Based on Labs 5 & 6
-"""
-
+"""DQN Agent module."""
+from .agent import DQNAgent
 from .network import DQNNetwork
 from .replay_buffer import ReplayBuffer
-from .agent import DQNAgent
+
+__all__ = ['DQNAgent', 'DQNNetwork', 'ReplayBuffer']
 
 __all__ = ['DQNNetwork', 'ReplayBuffer', 'DQNAgent']

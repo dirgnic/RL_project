@@ -1,138 +1,59 @@
 # Reinforcement Learning Project
 
-University project for implementing and comparing reinforcement learning algorithms.
-
-## Overview
-
-
-This project implements and compares three RL algorithms using [HighwayEnv](https://github.com/eleurent/highway-env):
-- **DQN** (Deep Q-Network)
-- **PPO** (Proximal Policy Optimization)
-- **A2C** (Advantage Actor-Critic)
-
-All agents are trained and evaluated on the HighwayEnv environment with custom reward shaping and logging.
+A clean, didactic implementation of RL algorithms for a custom Highway-env based environment.
 
 ## Quick Start
 
-### Installation
-
 ```bash
-# Clone repository
-git clone https://github.com/dirgnic/RL_project.git
-cd RL_project
+# Train agents
+python train_tabular.py      # Tabular Q-Learning (fastest)
+python train_reinforce.py    # Policy Gradient (best results)
+python train_dqn.py          # Deep Q-Network
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # macOS/Linux
-# or: venv\Scripts\activate  # Windows
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-See [SETUP.md](SETUP.md) for detailed installation instructions.
-
-
-### Train Agents
-
-```bash
-# Train DQN agent
-python train_dqn.py
-
-# Train PPO agent
-python train_ppo.py
-
-# Train A2C agent
-python train_a2c.py
-```
-
-### Evaluate and Plot Results
-
-```bash
-# Evaluate all trained agents
-python evaluate_agents.py
-
-# Plot comparison of agent performance
+# Plot results
 python plot_results.py
 ```
 
 ## Project Structure
 
 ```
-RL_proj/
-├── env/                # Environment loader and reward wrapper
-├── agents/dqn/         # (Legacy) DQN implementation (custom)
-├── train_dqn.py        # SB3 DQN training script
-├── train_ppo.py        # SB3 PPO training script
-├── train_a2c.py        # SB3 A2C training script
-├── evaluate_agents.py  # Evaluate all trained agents
-├── plot_results.py     # Plot agent performance
-├── results/            # Training logs, models, plots
-├── utils/              # Logging, plotting, metrics
-├── tests/              # Test scripts
-└── notebooks/          # Jupyter notebooks
+├── custom_env.py          # Custom Highway-env environment
+├── train_tabular.py       # Tabular Q-Learning training
+├── train_dqn.py           # DQN training  
+├── train_reinforce.py     # REINFORCE training
+├── plot_results.py        # Visualize training curves
+├── env/                   # Environment wrappers
+│   ├── __init__.py
+│   └── wrappers.py        # DiscreteAction, FlatObs, TabularObs
+├── agents/
+│   └── dqn/               # DQN implementation
+│       ├── agent.py       # DQNAgent class
+│       ├── network.py     # Neural network
+│       └── replay_buffer.py
+└── results/               # Training outputs (CSV, plots)
 ```
 
-## Features
+## Algorithms
 
-- **HighwayEnv Only**: Focused on the HighwayEnv driving environment
-- **Reward Shaping**: Custom reward wrapper for HighwayEnv
-- **SB3 Agents**: DQN, PPO, and A2C via Stable Baselines3
-- **Logging**: CSV logging for training and evaluation
-- **Visualization**: Boxplots and comparison of agent performance
-- **Model Persistence**: Save and load trained models
-- **Reproducibility**: Seed management for consistent results
+### 1. Tabular Q-Learning
+- Uses a table to store Q(state, action) values
+- State space is discretized into bins
+- Fast training (~500 episodes)
 
+### 2. DQN (Deep Q-Network)
+- Neural network approximates Q-values
+- Experience replay for stable learning
+- Target network for stable targets
+- ~200 episodes
 
-## Documentation
+### 3. REINFORCE
+- Directly learns a policy π(a|s)
+- Monte Carlo returns (full episode)
+- Often the best performer (~1000 episodes)
 
-- **Setup Guide**: [SETUP.md](SETUP.md)
-- **Implementation Summary**: [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)
-- **Environment Options**: [ENVIRONMENT_OPTIONS.md](ENVIRONMENT_OPTIONS.md)
+## Environment
 
-
-
-## Requirements
-
-- Python 3.10+
-- Gymnasium
-- HighwayEnv
-- Stable Baselines3
-- PyTorch
-- Matplotlib, Pandas, Seaborn
-
-See [requirements.txt](requirements.txt) for the full list.
-
-## Testing
-
-```bash
-# Test environment loading and wrappers
-python tests/test_environment.py
-```
-
-## Results
-
-Results are organized by agent:
-- `results/dqn/` - DQN results
-- `results/ppo/` - PPO results
-- `results/a2c/` - A2C results
-- `results/comparison/` - Comparison tables and plots
-
-## Contributing
-
-1. Create a new branch for your feature
-2. Make changes and test
-3. Commit with descriptive message
-4. Push and create pull request
-
-## License
-
-This is a university project for educational purposes.
-
-
-## Resources
-
-- [HighwayEnv Documentation](https://highway-env.farama.org/)
-- [Stable Baselines3 Documentation](https://stable-baselines3.readthedocs.io/)
-- [Gymnasium Documentation](https://gymnasium.farama.org/)
-- [PyTorch Documentation](https://pytorch.org/docs/stable/index.html)
+`MyCustomEnv` is a Highway-env based environment with:
+- **Observations**: Vehicle kinematics + fuel + passenger info + target direction
+- **Actions**: Discrete (Idle, Accelerate, Brake, Left, Right)
+- **Goal**: Pick up passengers and deliver them while managing fuel

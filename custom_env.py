@@ -7,21 +7,49 @@ from highway_env.vehicle.kinematics import Vehicle
 from highway_env.vehicle.behavior import IDMVehicle
 class MyCustomEnv(AbstractEnv):
     def _observe(self):
-        obs = super()._observe()
+        obs = self.observation_type.observe()
         # Add extra features: fuel, passenger info, and traffic penalty
         fuel_level = getattr(self.vehicle, 'fuel', 1.0)
         passenger_count = len(getattr(self, 'passengers', []))
         passenger_onboard = int(self.vehicle.passenger is not None)
         traffic_penalty = int(self._on_traffic_tile(self.vehicle.position))
+        
+        # Calculate target vector (dx, dy)
+        target_pos = np.array([0.0, 0.0])
+        if hasattr(self.vehicle, 'passenger') and self.vehicle.passenger:
+            target_pos = np.array(self.vehicle.passenger['dropoff'])
+        else:
+            # Find nearest waiting passenger
+            waiting = [p for p in getattr(self, 'passengers', []) if not p['onboard'] and not p['delivered']]
+            if waiting:
+                dists = [np.linalg.norm(np.array(self.vehicle.position) - np.array(p['pickup'])) for p in waiting]
+                target_pos = np.array(waiting[np.argmin(dists)]['pickup'])
+        
+        dx = target_pos[0] - self.vehicle.position[0]
+        dy = target_pos[1] - self.vehicle.position[1]
+
         # If obs is a dict, add fields; if array, append
         if isinstance(obs, dict):
             obs['fuel_level'] = fuel_level
             obs['passenger_count'] = passenger_count
             obs['passenger_onboard'] = passenger_onboard
             obs['traffic_penalty'] = traffic_penalty
+            obs['target_dx'] = dx
+            obs['target_dy'] = dy
         elif isinstance(obs, np.ndarray):
-            obs = np.concatenate([obs, [fuel_level, passenger_count, passenger_onboard, traffic_penalty]])
+            # Flatten first to ensure we can append scalars
+            obs_flat = obs.flatten()
+            obs = np.concatenate([obs_flat, [fuel_level, passenger_count, passenger_onboard, traffic_penalty, dx, dy]])
         return obs
+
+    def reset(self, seed=None, options=None):
+        _, info = super().reset(seed=seed, options=options)
+        return self._observe(), info
+
+    def step(self, action):
+        _, reward, terminated, truncated, info = super().step(action)
+        return self._observe(), reward, terminated, truncated, info
+
     def _init_taxi_upgrades(self):
         # Define map features for Taxi-v3 upgrades
         self.passengers = [
@@ -273,43 +301,45 @@ class MyCustomEnv(AbstractEnv):
         # Stop if we run out of steps
         self.current_step += 1
         return self.current_step >= self.max_steps
-# 1. Instantiate the environment
-# 1. Instantiate the environment class directly
-env = MyCustomEnv(render_mode='human') 
 
-# 2. Reset (Builds the road and vehicles)
-obs, info = env.reset()
+if __name__ == "__main__":
+    # 1. Instantiate the environment
+    # 1. Instantiate the environment class directly
+    env = MyCustomEnv(render_mode='human') 
 
-print("Environment created. Starting simulation...")
-failures=0
-while failures<1:
-        pygame.event.pump()
-        keys = pygame.key.get_pressed()
-            
-            # 3. Map Keys to Action Vector [Acceleration, Steering]
-            # Range is usually [-1, 1] for ContinuousAction
-        acceleration = 0.0
-        steering = 0.0
-            
-        if keys[pygame.K_UP]:
-            acceleration = 0.1   # Accelerate
-        elif keys[pygame.K_DOWN]:
-            acceleration = -0.05  # Brake/Reverse
+    # 2. Reset (Builds the road and vehicles)
+    obs, info = env.reset()
+
+    print("Environment created. Starting simulation...")
+    failures=0
+    while failures<1:
+            pygame.event.pump()
+            keys = pygame.key.get_pressed()
                 
-        if keys[pygame.K_LEFT]:
-            steering = -0.5      # Turn Left
-        elif keys[pygame.K_RIGHT]:
-            steering = 0.5       # Turn Right
-        
-        if keys[pygame.K_0]:
-            failures=10
-        action=[acceleration,steering]
-        obs, reward, terminated, truncated, info = env.step(action)
-        # Render the graphics (AbstractEnv handles the PyGame window for you!)
-        env.render()
-        
-        if terminated or truncated:
-            failures+=1
-            obs, info = env.reset()
+                # 3. Map Keys to Action Vector [Acceleration, Steering]
+                # Range is usually [-1, 1] for ContinuousAction
+            acceleration = 0.0
+            steering = 0.0
+                
+            if keys[pygame.K_UP]:
+                acceleration = 0.1   # Accelerate
+            elif keys[pygame.K_DOWN]:
+                acceleration = -0.05  # Brake/Reverse
+                    
+            if keys[pygame.K_LEFT]:
+                steering = -0.5      # Turn Left
+            elif keys[pygame.K_RIGHT]:
+                steering = 0.5       # Turn Right
+            
+            if keys[pygame.K_0]:
+                failures=10
+            action=[acceleration,steering]
+            obs, reward, terminated, truncated, info = env.step(action)
+            # Render the graphics (AbstractEnv handles the PyGame window for you!)
+            env.render()
+            
+            if terminated or truncated:
+                failures+=1
+                obs, info = env.reset()
 
-env.close()
+    env.close()
