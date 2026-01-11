@@ -44,7 +44,7 @@ def plot_results():
     os.makedirs('results', exist_ok=True)
     plt.savefig('results/training_comparison.png', dpi=150, bbox_inches='tight')
     print("\n✓ Plot saved to results/training_comparison.png")
-    plt.show()
+    # plt.show()
 
 
 if __name__ == "__main__":

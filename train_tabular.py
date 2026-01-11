@@ -14,6 +14,7 @@ How it works:
 import numpy as np
 import pandas as pd
 import os
+import json
 from env import load_environment, DiscreteActionWrapper, FlatObsWrapper, TabularObsWrapper
 
 
@@ -62,6 +63,14 @@ class TabularQAgent:
         """Reduce exploration over time."""
         self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
 
+    def save(self, path):
+        """Save Q-table to file."""
+        np.save(path, self.q_table)
+
+    def load(self, path):
+        """Load Q-table from file."""
+        self.q_table = np.load(path)
+
 
 def train():
     """Main training loop."""
@@ -78,6 +87,18 @@ def train():
     agent = TabularQAgent(obs_bins, action_size)
     episodes = 500
     rewards_history = []
+
+    # Load previous best (across runs) if it exists
+    os.makedirs('results', exist_ok=True)
+    best_avg = -float('inf')
+    best_meta_path = 'results/tabular_best.json'
+    if os.path.exists(best_meta_path):
+        try:
+            with open(best_meta_path, 'r') as f:
+                meta = json.load(f)
+                best_avg = float(meta.get('best_avg', best_avg))
+        except Exception:
+            pass
     
     print(f"Training Tabular Q-Learning for {episodes} episodes...")
     print(f"State space size: {np.prod(obs_bins)} states, {action_size} actions")
@@ -104,6 +125,15 @@ def train():
         if (ep + 1) % 100 == 0:
             avg = np.mean(rewards_history[-100:])
             print(f"Episode {ep+1}/{episodes} | Reward: {total_reward:.1f} | Avg100: {avg:.1f} | ε: {agent.epsilon:.2f}")
+
+            # Save best model so far based on Avg100
+            if avg > best_avg:
+                best_avg = avg
+                agent.save("results/tabular_model.npy")
+                # Persist new best metric
+                with open(best_meta_path, 'w') as f:
+                    json.dump({'best_avg': best_avg}, f)
+                print(f"✓ New best Tabular model saved (Avg100={best_avg:.2f})")
 
     # Save results
     os.makedirs('results', exist_ok=True)

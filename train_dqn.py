@@ -15,6 +15,7 @@ Architecture: State → [64] → [32] → Q-values
 import numpy as np
 import pandas as pd
 import os
+import json
 from env import load_environment, DiscreteActionWrapper, FlatObsWrapper
 from agents.dqn.agent import DQNAgent
 
@@ -44,9 +45,23 @@ def train():
 
     episodes = 500  # Increased for convergence
     rewards_history = []
+
+    # Load previous best (across runs) if it exists
+    os.makedirs('results', exist_ok=True)
+    best_avg = -float('inf')
+    best_meta_path = 'results/dqn_best.json'
+    if os.path.exists(best_meta_path):
+        try:
+            with open(best_meta_path, 'r') as f:
+                meta = json.load(f)
+                best_avg = float(meta.get('best_avg', best_avg))
+        except Exception:
+            pass
     
     print(f"Training DQN for {episodes} episodes...")
     print(f"Observation dim: {obs_dim}, Actions: {action_dim}")
+
+    global_steps = 0
 
     for ep in range(episodes):
         obs, _ = env.reset()
@@ -63,19 +78,51 @@ def train():
             
             obs = next_obs
             total_reward += reward
+
+            # Count environment steps and occasionally run a tiny visual demo
+            global_steps += 1
+            if global_steps % 100 == 0:
+                try:
+                    print("\n[Visual] Running short demo episode...")
+                    demo_env = DiscreteActionWrapper(load_environment("MyCustomEnv", render_mode="human"))
+                    demo_env = FlatObsWrapper(demo_env)
+                    demo_obs, _ = demo_env.reset()
+                    demo_done = False
+                    demo_steps = 0
+                    while not demo_done and demo_steps < 150:
+                        demo_action = agent.select_action(demo_obs, training=False)
+                        demo_obs, _, demo_term, demo_trunc, _ = demo_env.step(demo_action)
+                        demo_env.render()
+                        demo_done = demo_term or demo_trunc
+                        demo_steps += 1
+                    demo_env.close()
+                except Exception:
+                    # Demo is purely for visualization; ignore any errors
+                    pass
             
         agent.decay_epsilon()
         rewards_history.append(total_reward)
+
+        # Per-episode log so you always see progress
+        print(f"Ep {ep+1}/{episodes} | Reward: {total_reward:.1f} | ε: {agent.epsilon:.2f}")
         
         if (ep + 1) % 20 == 0:
             avg = np.mean(rewards_history[-20:])
-            print(f"Episode {ep+1}/{episodes} | Reward: {total_reward:.1f} | Avg20: {avg:.1f} | ε: {agent.epsilon:.2f}")
+            print(f"  Avg20: {avg:.1f}")
+
+            # Save best model so far based on moving average
+            if avg > best_avg:
+                best_avg = avg
+                agent.save("results/dqn_model.pth")
+                # Persist new best metric
+                with open(best_meta_path, 'w') as f:
+                    json.dump({'best_avg': best_avg}, f)
+                print(f"  ✓ New best DQN model saved (Avg20={best_avg:.2f})")
 
     # Save results
     os.makedirs('results', exist_ok=True)
     df = pd.DataFrame({'episode': range(1, episodes + 1), 'reward': rewards_history})
     df.to_csv('results/dqn_training.csv', index=False)
-    agent.save("results/dqn_model.pth")
     print("\n✓ Results saved to results/dqn_training.csv")
 
 

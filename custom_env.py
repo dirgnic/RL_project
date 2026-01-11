@@ -1,104 +1,12 @@
+import gymnasium as gym
 import numpy as np
 import pygame
 from highway_env.envs.common.abstract import AbstractEnv
 from highway_env.road.road import Road, RoadNetwork
-from highway_env.road.lane import StraightLane, CircularLane, LineType
+from highway_env.road.lane import StraightLane, SineLane, CircularLane, LineType
 from highway_env.vehicle.kinematics import Vehicle
 from highway_env.vehicle.behavior import IDMVehicle
 class MyCustomEnv(AbstractEnv):
-    def _observe(self):
-        obs = self.observation_type.observe()
-        # Add extra features: fuel, passenger info, and traffic penalty
-        fuel_level = getattr(self.vehicle, 'fuel', 1.0)
-        passenger_count = len(getattr(self, 'passengers', []))
-        passenger_onboard = int(self.vehicle.passenger is not None)
-        traffic_penalty = int(self._on_traffic_tile(self.vehicle.position))
-        
-        # Calculate target vector (dx, dy)
-        target_pos = np.array([0.0, 0.0])
-        if hasattr(self.vehicle, 'passenger') and self.vehicle.passenger:
-            target_pos = np.array(self.vehicle.passenger['dropoff'])
-        else:
-            # Find nearest waiting passenger
-            waiting = [p for p in getattr(self, 'passengers', []) if not p['onboard'] and not p['delivered']]
-            if waiting:
-                dists = [np.linalg.norm(np.array(self.vehicle.position) - np.array(p['pickup'])) for p in waiting]
-                target_pos = np.array(waiting[np.argmin(dists)]['pickup'])
-        
-        dx = target_pos[0] - self.vehicle.position[0]
-        dy = target_pos[1] - self.vehicle.position[1]
-
-        # If obs is a dict, add fields; if array, append
-        if isinstance(obs, dict):
-            obs['fuel_level'] = fuel_level
-            obs['passenger_count'] = passenger_count
-            obs['passenger_onboard'] = passenger_onboard
-            obs['traffic_penalty'] = traffic_penalty
-            obs['target_dx'] = dx
-            obs['target_dy'] = dy
-        elif isinstance(obs, np.ndarray):
-            # Flatten first to ensure we can append scalars
-            obs_flat = obs.flatten()
-            obs = np.concatenate([obs_flat, [fuel_level, passenger_count, passenger_onboard, traffic_penalty, dx, dy]])
-        return obs
-
-    def reset(self, seed=None, options=None):
-        _, info = super().reset(seed=seed, options=options)
-        return self._observe(), info
-
-    def step(self, action):
-        _, reward, terminated, truncated, info = super().step(action)
-        return self._observe(), reward, terminated, truncated, info
-
-    def _init_taxi_upgrades(self):
-        # Define map features for Taxi-v3 upgrades
-        self.passengers = [
-            {'pickup': (10, 10), 'dropoff': (90, 90), 'onboard': False, 'delivered': False},
-            {'pickup': (80, 20), 'dropoff': (20, 80), 'onboard': False, 'delivered': False}
-        ]
-        self.fuel_capacity = 100.0
-        self.fuel_consumption_per_step = 1.0
-        self.refuel_stations = [(50, 0), (0, 50)]
-        self.traffic_tiles = [(60, 60), (40, 40), (70, 30)]
-        self.traffic_penalty = -0.5
-        self.fuel_penalty = -1.0
-        self.pickup_reward = 1.0
-        self.dropoff_reward = 5.0
-        self.refuel_amount = 100.0
-        self.max_steps = 300
-        self.current_step = 0
-
-    def _on_traffic_tile(self, pos):
-        # Simple check: if within 5 units of a traffic tile
-        for t in self.traffic_tiles:
-            if np.linalg.norm(np.array(pos) - np.array(t)) < 5.0:
-                return True
-        return False
-
-    def _on_refuel_station(self, pos):
-        for s in self.refuel_stations:
-            if np.linalg.norm(np.array(pos) - np.array(s)) < 5.0:
-                return True
-        return False
-
-    def _check_pickup(self):
-        for p in self.passengers:
-            if not p['onboard'] and not p['delivered'] and np.linalg.norm(np.array(self.vehicle.position) - np.array(p['pickup'])) < 5.0:
-                p['onboard'] = True
-                self.vehicle.passenger = p
-                return self.pickup_reward
-        return 0.0
-
-    def _check_dropoff(self):
-        if hasattr(self.vehicle, 'passenger') and self.vehicle.passenger is not None:
-            p = self.vehicle.passenger
-            if np.linalg.norm(np.array(self.vehicle.position) - np.array(p['dropoff'])) < 5.0:
-                p['onboard'] = False
-                p['delivered'] = True
-                self.vehicle.passenger = None
-                return self.dropoff_reward
-        return 0.0
-
     @classmethod
     def default_config(cls) -> dict:
         config = super().default_config()
@@ -244,66 +152,78 @@ class MyCustomEnv(AbstractEnv):
             speed=0.3,
             heading=0
         )
-        self.vehicle.fuel = self.fuel_capacity
-        self.vehicle.passenger = None
         self.road.vehicles.append(self.vehicle)
-        # Add random traffic vehicles (obstacles)
-        for i in range(0, 10):
-            vehicle = IDMVehicle(self.road, position=[np.random.randint(0, 100), np.random.randint(0, 100)], speed=np.random.randint(3, 7))
-            vehicle.lane_index = self.road.network.get_closest_lane_index(vehicle.position)
+        obstacle = IDMVehicle(self.road, position=[75, 0], speed=5)
+        obstacle2 = IDMVehicle(self.road, position=[100, 200], speed=5)
+        obstacle3 = IDMVehicle(self.road, position=[50, -75], speed=7)
+        for i in range(0,20):
+            vehicle=IDMVehicle(self.road, position=[np.random.randint(0,100), np.random.randint(0,200)],speed=np.random.randint(3,7))
+            vehicle.lane_index=self.road.network.get_closest_lane_index(vehicle.position)
             self.road.vehicles.append(vehicle)
-        # Restore specific obstacles and route planning
-        obstacle = IDMVehicle(self.road, position=[20, 20], speed=2)
-        obstacle2 = IDMVehicle(self.road, position=[80, 80], speed=2)
-        obstacle3 = IDMVehicle(self.road, position=[50, 50], speed=2)
+        obstacle.lane_index=self.road.network.get_closest_lane_index(obstacle.position)
+        obstacle2.lane_index=self.road.network.get_closest_lane_index(obstacle2.position)
+        obstacle3.lane_index=self.road.network.get_closest_lane_index(obstacle3.position)
         path = self.road.network.shortest_path("b0", "c0")
         obstacle3.plan_route_to("c0")
         self.road.vehicles.append(obstacle)
         self.road.vehicles.append(obstacle2)
         self.road.vehicles.append(obstacle3)
-        # ...existing code...
     def _reward(self, action):
-        # Taxi-v3 upgrades: reward for pickups, dropoffs, penalties for fuel, traffic, etc.
-        reward = 0.0
-        # Step fuel consumption
-        self.vehicle.fuel -= self.fuel_consumption_per_step
-        if self.vehicle.fuel <= 0:
-            reward += self.fuel_penalty
-        # Traffic penalty
-        if self._on_traffic_tile(self.vehicle.position):
-            reward += self.traffic_penalty
-        # Pickup/dropoff
-        reward += self._check_pickup()
-        reward += self._check_dropoff()
-        # Optionally add driving reward (centered, speed, etc.)
+        # 1. Weights (Tune these!)
+        COLLISION_PENALTY = -1.0  # Normalized to -1 (easier for PPO than -1000)
+        OFF_ROAD_PENALTY = -1.0
+        HIGH_SPEED_REWARD = 0.5
+        LANE_CENTERING_REWARD = 0.5
+
+
+        # 2. Check Failures First (Terminal states)
+        if self.vehicle.crashed:
+            return COLLISION_PENALTY
+        if not self.vehicle.on_road:
+            return OFF_ROAD_PENALTY
         lane = self.vehicle.lane
-        lane_heading = lane.heading_at(self.vehicle.position[0])
+        lane_heading = lane.heading_at(self.vehicle.position[0]) # approx using X or longitudinal
         heading_error = np.abs(self.vehicle.heading - lane_heading)
         heading_error = (heading_error + np.pi) % (2 * np.pi) - np.pi
+        
+        # Cosine Similarity: 
+        # 1.0 if perfectly aligned
+        # 0.0 if 90 degrees sideways
+        # -1.0 if going backwards
         alignment_factor = np.cos(heading_error)
+        
+        # Scaled Speed Reward:
+        # If we are going 30m/s aligned: Reward is high.
+        # If we are going 30m/s backwards: Reward is negative (Punishment).
         speed_reward = (self.vehicle.speed / lane.speed_limit) * alignment_factor
+
+        # 4. Calculate Lane Centering (Gaussian Bell Curve)
+        # Using the vehicle's lateral position relative to the lane center
+        # .local_coordinates returns [longitudinal, lateral]
         long, lat = lane.local_coordinates(self.vehicle.position)
+        
+        # This returns 1.0 if exactly in center, drops to 0.0 as we move away
         centering_reward = np.exp(-1 * (lat**2))
-        reward += 0.2 * speed_reward + 0.2 * centering_reward
-        return reward
+        total_reward = (HIGH_SPEED_REWARD * speed_reward) + \
+                       (LANE_CENTERING_REWARD * centering_reward)        
+        return total_reward
     
-    def _reset(self) -> None:
-        self._init_taxi_upgrades()
+    def _reset(self) -> None :
         self._make_road()
         self._make_vehicles()
-        self.current_step = 0
     def _is_terminated(self):
-        # Stop if we crash, run out of fuel, or all passengers delivered
-        all_delivered = all(p['delivered'] for p in self.passengers)
-        return self.vehicle.crashed or self.vehicle.fuel <= 0 or all_delivered
+        # Stop if we crash or leave the road
+        return self.vehicle.crashed or not self.vehicle.on_road
 
     def _is_truncated(self):
-        # Stop if we run out of steps
-        self.current_step += 1
-        return self.current_step >= self.max_steps
+        # Truncate when the time limit specified in the config is reached
+        return self.time >= self.config["duration"]
+
 
 if __name__ == "__main__":
-    # 1. Instantiate the environment
+    # Manual keyboard control demo - only runs when executing this file directly
+    import time
+    
     # 1. Instantiate the environment class directly
     env = MyCustomEnv(render_mode='human') 
 
@@ -311,35 +231,36 @@ if __name__ == "__main__":
     obs, info = env.reset()
 
     print("Environment created. Starting simulation...")
-    failures=0
-    while failures<1:
-            pygame.event.pump()
-            keys = pygame.key.get_pressed()
-                
-                # 3. Map Keys to Action Vector [Acceleration, Steering]
-                # Range is usually [-1, 1] for ContinuousAction
-            acceleration = 0.0
-            steering = 0.0
-                
-            if keys[pygame.K_UP]:
-                acceleration = 0.1   # Accelerate
-            elif keys[pygame.K_DOWN]:
-                acceleration = -0.05  # Brake/Reverse
-                    
-            if keys[pygame.K_LEFT]:
-                steering = -0.5      # Turn Left
-            elif keys[pygame.K_RIGHT]:
-                steering = 0.5       # Turn Right
+    failures = 0
+    while failures < 1:
+        pygame.event.pump()
+        keys = pygame.key.get_pressed()
+        
+        # 3. Map Keys to Action Vector [Acceleration, Steering]
+        # Range is usually [-1, 1] for ContinuousAction
+        acceleration = 0.0
+        steering = 0.0
+        
+        if keys[pygame.K_UP]:
+            acceleration = 0.1   # Accelerate
+        elif keys[pygame.K_DOWN]:
+            acceleration = -0.05  # Brake/Reverse
             
-            if keys[pygame.K_0]:
-                failures=10
-            action=[acceleration,steering]
-            obs, reward, terminated, truncated, info = env.step(action)
-            # Render the graphics (AbstractEnv handles the PyGame window for you!)
-            env.render()
-            
-            if terminated or truncated:
-                failures+=1
-                obs, info = env.reset()
+        if keys[pygame.K_LEFT]:
+            steering = -0.5      # Turn Left
+        elif keys[pygame.K_RIGHT]:
+            steering = 0.5       # Turn Right
+        
+        if keys[pygame.K_0]:
+            failures = 10
+        
+        action = [acceleration, steering]
+        obs, reward, terminated, truncated, info = env.step(action)
+        # Render the graphics (AbstractEnv handles the PyGame window for you!)
+        env.render()
+        
+        if terminated or truncated:
+            failures += 1
+            obs, info = env.reset()
 
     env.close()

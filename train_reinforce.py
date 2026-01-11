@@ -14,6 +14,7 @@ This is the simplest policy gradient algorithm - no critic, no baseline.
 import numpy as np
 import pandas as pd
 import os
+import json
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -61,6 +62,11 @@ class REINFORCEAgent:
             returns.insert(0, G)
         
         returns = torch.tensor(returns, dtype=torch.float32)
+        
+        # Normalize returns for stability (Crucial for REINFORCE!)
+        if len(returns) > 1:
+            returns = (returns - returns.mean()) / (returns.std() + 1e-9)
+            
         log_probs = torch.stack([lp for lp, _ in trajectory])
         
         # Policy gradient: maximize log_prob * return
@@ -71,6 +77,15 @@ class REINFORCEAgent:
         self.optimizer.step()
         
         return loss.item()
+
+    def save(self, path):
+        """Save the policy network."""
+        torch.save(self.policy.state_dict(), path)
+        
+    def load(self, path):
+        """Load the policy network."""
+        self.policy.load_state_dict(torch.load(path))
+        self.policy.eval()
 
 
 def train():
@@ -87,6 +102,18 @@ def train():
     agent = REINFORCEAgent(obs_dim, action_dim, lr=1e-3)
     episodes = 1000
     rewards_history = []
+
+    # Load previous best (across runs) if it exists
+    os.makedirs('results', exist_ok=True)
+    best_avg = -float('inf')
+    best_meta_path = 'results/reinforce_best.json'
+    if os.path.exists(best_meta_path):
+        try:
+            with open(best_meta_path, 'r') as f:
+                meta = json.load(f)
+                best_avg = float(meta.get('best_avg', best_avg))
+        except Exception:
+            pass
     
     print(f"Training REINFORCE for {episodes} episodes...")
     print(f"Observation dim: {obs_dim}, Actions: {action_dim}")
@@ -113,6 +140,15 @@ def train():
         if (ep + 1) % 100 == 0:
             avg = np.mean(rewards_history[-100:])
             print(f"Episode {ep+1}/{episodes} | Reward: {total_reward:.1f} | Avg100: {avg:.1f}")
+
+            # Save best model so far based on Avg100
+            if avg > best_avg:
+                best_avg = avg
+                agent.save("results/reinforce_model.pth")
+                # Persist new best metric
+                with open(best_meta_path, 'w') as f:
+                    json.dump({'best_avg': best_avg}, f)
+                print(f"✓ New best REINFORCE model saved (Avg100={best_avg:.2f})")
 
     # Save results
     os.makedirs('results', exist_ok=True)
