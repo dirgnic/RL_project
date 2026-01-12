@@ -9,3 +9,9 @@ venv/
 env/
 ENV/
 rl_project_env/
+# Large media files
+*.mp4
+*.mov
+*.avi
+docs/*.mp4
+docs/*.mov

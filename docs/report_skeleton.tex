@@ -2,6 +2,8 @@
 \documentclass[11pt,a4paper]{article}
 
 \usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[romanian]{babel}
 \usepackage[margin=2.5cm]{geometry}
 \usepackage{amsmath, amssymb}
 \usepackage{graphicx}
@@ -14,7 +16,7 @@
 % Include diagram macros
 \input{diagrams.tex}
 
-\title{Reinforcement Learning pentru Conducere Autonomă într-un Environment Personalizat "Highway"}
+\title{Reinforcement Learning pentru conducere autonomă într-un mediu personalizat ``Highway''}
 \author{Echipa Juno \\ Corobana Ingrid \\ Moise Irina \\ Prizlopan Iustin \\ Sescu Matei}
 \date{Ianuarie 2026}
 
@@ -24,31 +26,33 @@
 
 \section{Formularea problemei}
 
-Obiectivul proiectului este antrenarea unui agent de control pentru un vehicul ego (masina galbena)
-intr-un mediu de trafic. Agentul trebuie sa circule pe un drum cu mai multe benzi, sa evite
-coliziunile cu vehiculele din trafic (masinile albastre), sa ramana pe carosabil si, in acelasi timp,
-sa mentina o viteza rezonabila. Problema este formulata ca o problema de Reinforcement Learning
-in care agentul invata un policy doar pe baza recompensei primite din mediu.
+Obiectivul proiectului este antrenarea unui agent de control pentru un vehicul \emph{ego} (mașina galbenă)
+într-un mediu de trafic. Agentul trebuie să circule pe un drum cu mai multe benzi, să evite
+coliziunile cu vehiculele din trafic (mașinile albastre), să rămână pe carosabil și, în același timp,
+să mențină o viteză rezonabilă.
 
-\subsection{Stare, actiune, recompensa}
+Problema este formulată ca o problemă de \textbf{Reinforcement Learning (RL)}, în care agentul învață
+o politică (\emph{policy}) exclusiv pe baza recompensei primite de la mediu.
 
-Modelam problema in termeni de \emph{stare}, \emph{actiune} si \emph{recompensa} astfel:
+\subsection{Stare, acțiune, recompensă}
+
+Modelăm problema în termeni de \emph{stare}, \emph{acțiune} și \emph{recompensă} astfel:
 \begin{itemize}
-  \item \textbf{Stare}: observatia de baza a mediului este de tip \texttt{"Kinematics"} din
-  	exttt{highway\_env}. Dupa aplicarea lui \texttt{FlatObsWrapper}, obtinem un vector continuu
-  de dimensiune 25, care contine pozitia, viteza si orientarea vehiculului ego, precum si informatii
-  agregate despre cateva vehicule din jur.
-  \item \textbf{Actiune}: mediul original este cu actiuni continue (acceleratie, directie). Pentru
-  agentii discreti folosim un wrapper \texttt{DiscreteActionWrapper} care defineste 5 actiuni:
+  \item \textbf{Stare (observație):} observația de bază a mediului este de tip \emph{Kinematics}
+  (din pachetul \texttt{highway\_env}). După aplicarea \texttt{FlatObsWrapper}, obținem un vector
+  continuu de dimensiune \textbf{25}, care conține poziția, viteza și orientarea vehiculului \emph{ego},
+  plus informații agregate despre câteva vehicule din proximitate.
+  \item \textbf{Acțiune}: mediul original are acțiuni continue (accelerație și direcție). Pentru agenții
+  discreți folosim un wrapper \texttt{DiscreteActionWrapper} care definește \textbf{5 acțiuni}:
   \emph{Idle} (0), \emph{Accelerate} (1), \emph{Brake} (2), \emph{Left} (3), \emph{Right} (4).
-  \item \textbf{Recompensa}: functia de recompensa din \texttt{custom\_env.py} combina mai multe
-  componente: penalizari puternice pentru coliziune sau iesirea de pe drum si termeni pozitivi pentru
-  viteza ridicata aliniata cu sensul benzii si pentru pozitionarea aproape de centrul benzii
-  (lane centering). In acest fel, agentul primeste feedback la fiecare pas de timp, nu doar la
-  finalul episodului.
+  \item \textbf{Recompensă}: funcția de recompensă din \texttt{custom\_env.py} combină mai multe
+  componente: penalizări puternice pentru \textbf{coliziune} sau \textbf{ieșirea de pe drum} și
+  termeni pozitivi pentru \textbf{viteză ridicată} (aliniată cu sensul benzii) și pentru
+  	\textbf{menținerea poziției aproape de centrul benzii} (\emph{lane centering}). În acest fel,
+  agentul primește feedback la fiecare pas de timp, nu doar la finalul episodului.
 \end{itemize}
 
-Diagrama generala agent--mediu este prezentata in Figura~\ref{fig:rl-loop}.
+Diagrama generală agent--mediu este prezentată în Figura~\ref{fig:rl-loop}.
 \begin{figure}[h]
   \centering
   \RLLoopDiagram
@@ -58,62 +62,64 @@ Diagrama generala agent--mediu este prezentata in Figura~\ref{fig:rl-loop}.
 
 \section{Environment Design}
 
-Mediul este construit plecand de la pachetul \texttt{highway\_env}, dar logica drumului si a
-traficului a fost rescrisa in fisierul \texttt{custom\_env.py}. Drumul este reprezentat ca un
-graf de benzi (\texttt{RoadNetwork}) cu mai multe sectiuni: un segment drept de intrare, o zona
-de imbinare (merge) cu o banda laterala, un viraj circular, portiuni drepte suplimentare si o
-iesire verticala catre un nod final \texttt{c0}. Sunt definite mai multe benzi folosind clasele
-	exttt{StraightLane} si \texttt{CircularLane}, inclusiv o banda de intrare laterala pentru
-vehiculele care se incadreaza in trafic.
+Mediul este construit pornind de la pachetul \texttt{highway\_env}, însă logica drumului și a
+traficului a fost rescrisă în fișierul \texttt{custom\_env.py}.
 
-Vehiculele din trafic sunt de tip \texttt{IDMVehicle} (model de conducere IDM) si sunt plasate
-atat pe sectiuni fixe (obstacole pozitionate manual), cat si aleator pe drum. Pentru unele
-vehicule folosim metoda \texttt{plan\_route\_to} pentru a le forta sa urmeze un traseu prin
-retea (de exemplu, de la nodul \texttt{b0} la \texttt{c0}). La fiecare pas de timp,
-	exttt{highway\_env} actualizeaza automat dinamica tuturor vehiculelor.
+Drumul este reprezentat ca un graf de benzi (\texttt{RoadNetwork}) și include mai multe secțiuni:
+un segment drept de intrare, o zonă de îmbinare (\emph{merge}) cu o bandă laterală, un viraj
+circular, porțiuni drepte suplimentare și o ieșire verticală către un nod final \texttt{c0}.
+Sunt definite mai multe benzi folosind clasele \texttt{StraightLane} și \texttt{CircularLane},
+inclusiv o bandă de intrare laterală pentru vehiculele care se încadrează în trafic.
 
-Episodul se termina atunci cand vehiculul ego se ciocneste sau paraseste drumul, iar trunchierea
-se produce cand timpul depaseste \texttt{config["duration"]}. Aceste conditii asigura episoade
-finite si un semnal de invatare bine definit pentru toti agentii.
+Vehiculele din trafic sunt de tip \texttt{IDMVehicle} (model de conducere IDM) și sunt plasate
+atât pe secțiuni fixe (obstacole poziționate manual), cât și aleator pe drum. Pentru unele
+vehicule folosim metoda \texttt{plan\_route\_to} pentru a le forța să urmeze un traseu prin
+rețea (de exemplu, de la nodul \texttt{b0} la \texttt{c0}). La fiecare pas de timp,
+  	exttt{highway\_env} actualizează automat dinamica tuturor vehiculelor.
+
+Episodul se termină atunci când vehiculul \emph{ego} se ciocnește sau părăsește drumul, iar
+trunchierea se produce când timpul depășește \texttt{config["duration"]}. Aceste condiții asigură
+episoade finite și un semnal de învățare bine definit pentru toți agenții.
 
 \section{Algoritmi}
 
-In acelasi mediu am antrenat si comparat trei tipuri de agenti:
-un agent tabular (Q-Learning), un agent DQN si un agent de tip policy gradient
+În același mediu am antrenat și comparat trei tipuri de agenți:
+un agent tabular (Q-Learning), un agent DQN și un agent de tip policy gradient
 (REINFORCE cu baseline de valoare).
 
 \subsection{Tabular Q-Learning}
 
-Agentul tabular foloseste o reprezentare discretizata a starii, obtinuta prin wrapper-ul
-	exttt{TabularObsWrapper}. Observatia continua este proiectata intr-un vector de 6 componente:
-pozitia ego pe o grila 2D (x, y), un nivel discretizat de combustibil si doua variabile discrete
-care codifica directia aproximativa catre tinta (dx, dy), impreuna cu o componenta binara simpla
-de context. Dimensiunile de discretizare sunt $[6, 6, 3, 2, 3, 3]$, rezultand 1944 de stari posibile.
+Agentul tabular folosește o reprezentare discretizată a stării, obținută prin wrapper-ul
+  exttt{TabularObsWrapper}. Observația continuă este proiectată într-un vector de 6 componente:
+poziția \emph{ego} pe o grilă 2D (x, y), un nivel discretizat de combustibil și două variabile
+discrete care codifică direcția aproximativă către țintă (dx, dy), împreună cu o componentă binară
+simplă de context. Dimensiunile de discretizare sunt $[6, 6, 3, 2, 3, 3]$, rezultând 1944 de stări
+posibile.
 
-Pentru fiecare stare discreta se pastreaza o valoare $Q(s,a)$ intr-un tabel cu 5 actiuni. Actualizarea
-este cea clasica de Q-Learning:
+Pentru fiecare stare discretă se păstrează o valoare $Q(s,a)$ într-un tabel cu 5 acțiuni. Actualizarea
+este cea clasică de Q-Learning:
 \[
 Q(s,a) \leftarrow Q(s,a) + \alpha \bigl(r + \gamma \max\limits_{a'} Q(s', a') - Q(s,a)\bigr),
 \]
-cu factor de invatare $\alpha = 0{,}05$, factor de discount $\gamma = 0{,}99$ si o strategie
-epsilon-greedy pentru explorare, cu $\varepsilon$ care scade treptat de la 1 la 0.05.
+cu factor de învățare $\alpha = 0{,}05$, factor de discount $\gamma = 0{,}99$ și o strategie
+$\varepsilon$-greedy pentru explorare, cu $\varepsilon$ care scade treptat de la 1 la 0.05.
 
 \subsection{Deep Q-Network (DQN)}
 
-Agentul DQN foloseste direct vectorul continuu de 25 de dimensiuni ca intrare intr-o retea neuronala
-feed-forward. Arhitectura implementata in proiect este:
+Agentul DQN folosește direct vectorul continuu de 25 de dimensiuni ca intrare într-o rețea neuronală
+feed-forward. Arhitectura implementată în proiect este:
 \begin{itemize}
   \item strat de intrare: vectorul de stare (25 dimensiuni);
-  \item doua straturi ascunse dense cu 256 si respectiv 128 de neuroni si activare ReLU;
-  \item strat de iesire: 5 neuroni care produc valorile $Q(s,a)$ pentru fiecare actiune discreta.
+  \item două straturi ascunse dense cu 256 și respectiv 128 de neuroni și activare ReLU;
+  \item strat de ieșire: 5 neuroni care produc valorile $Q(s,a)$ pentru fiecare acțiune discretă.
 \end{itemize}
 
-Reteaua este antrenata folosind experience replay (buffer de 50\,000 de tranzitii) si un
-\emph{target network} sincronizat periodic. La fiecare pas, o tranzitie $(s,a,r,s',\text{done})$
-este adaugata in buffer, iar cand exista suficiente exemple se esantioneaza mini-loturi de marime 64.
-Tintelor de invatare li se aplica fie formula clasica DQN, fie varianta Double DQN (selectie
-de actiune cu \texttt{policy\_net}, evaluare cu \texttt{target\_net}). Functia de pierdere este
-Huber (\texttt{SmoothL1Loss}). Explorarea se face cu o strategie epsilon-greedy cu
+Rețeaua este antrenată folosind experience replay (buffer de 50\,000 de tranziții) și un
+\emph{target network} sincronizat periodic. La fiecare pas, o tranziție $(s,a,r,s',\text{done})$
+este adăugată în buffer, iar când există suficiente exemple se eșantionează mini-loturi de mărime 64.
+Țintelor de învățare li se aplică fie formula clasică DQN, fie varianta Double DQN (selecție
+de acțiune cu \texttt{policy\_net}, evaluare cu \texttt{target\_net}). Funcția de pierdere este
+Huber (\texttt{SmoothL1Loss}). Explorarea se face cu o strategie $\varepsilon$-greedy cu
 $\varepsilon$ care scade de la 1.0 la 0.01.
 
 Diagrama de arhitectura DQN este prezentata in Figura~\ref{fig:dqn-arch}.
@@ -127,119 +133,147 @@ Diagrama de arhitectura DQN este prezentata in Figura~\ref{fig:dqn-arch}.
 \subsection{Policy Gradient (REINFORCE + Baseline)}
 
 Al treilea agent este unul de tip policy-based. Politica $\pi_\theta(a\mid s)$ este
-parametrizata de o retea neuronala (\texttt{PolicyNetwork}) cu un singur strat ascuns de 64
-de neuroni si iesire softmax peste cele 5 actiuni. In plus, am introdus un \emph{value network}
-care aproximeaza functia de valoare $V_\phi(s)$ si este antrenat impreuna cu politica.
+parametrizată de o rețea neuronală (\texttt{PolicyNetwork}) cu un singur strat ascuns de 64
+neuroni și ieșire softmax peste cele 5 acțiuni. În plus, am introdus un \emph{value network}
+care aproximează funcția de valoare $V_\phi(s)$ și este antrenat împreună cu politica.
 
-Update-ul foloseste REINFORCE cu advantage:
+Update-ul folosește REINFORCE cu advantage:
 \[
 \nabla J(\theta) \approx \sum_t \log \pi_\theta(a_t \mid s_t) \cdot A_t, \quad
 A_t = G_t - V_\phi(s_t),
 \]
-unde $G_t$ este returnul Monte Carlo din pasul $t$. Valoarea este antrenata cu eroare patratica
-fata de $G_t$, iar pierderea totala este suma dintre pierderea de politica si o componenta de
-valoare ponderata. Acest baseline reduce varianta gradientului si imbunatateste stabilitatea
-fata de REINFORCE simplu.
+unde $G_t$ este returnul Monte Carlo din pasul $t$. Valoarea este antrenată cu eroare pătratică
+față de $G_t$, iar pierderea totală este suma dintre pierderea de politică și o componentă de
+valoare ponderată. Acest baseline reduce varianța gradientului și îmbunătățește stabilitatea
+față de REINFORCE simplu.
 
 \section{Experimente}
 
-Obiectivul experimental a fost compararea celor trei agenti (tabular, DQN si
-REINFORCE cu baseline) in exact acelasi mediu si cu acelasi set de actiuni
+Obiectivul experimental a fost compararea celor trei agenți (tabular, DQN și
+REINFORCE cu baseline) în exact același mediu și cu același set de acțiuni
 discrete. Pentru fiecare agent am definit un script separat de antrenare
-(`train\_tabular.py`, `train\_dqn.py`, `train\_reinforce.py`) si am pastrat
-aceleasi conditii de initializare ale mediului.
+(\texttt{train\_tabular.py}, \texttt{train\_dqn.py}, \texttt{train\_reinforce.py}) și am păstrat
+aceleași condiții de inițializare ale mediului.
 
-Pentru DQN si agentul tabular am rulat cate 500 de episoade de antrenare,
-in timp ce pentru REINFORCE am folosit 1000 de episoade pentru a compensa
-varianta mai mare a gradientului de politica. La fiecare episod am inregistrat
-recompensa cumulata si am salvat un model „best” pe baza mediei mobile a
+Pentru DQN și agentul tabular am rulat câte 500 de episoade de antrenare,
+în timp ce pentru REINFORCE am folosit 1000 de episoade pentru a compensa
+varianța mai mare a gradientului de politică. La fiecare episod am înregistrat
+recompensa cumulată și am salvat un model „best” pe baza mediei mobile a
 ultimelor 20--50 de episoade.
 
-Pentru a vizualiza evolutia antrenarii, scriptul `plot\_results.py` incarca
-fisierele CSV generate de fiecare agent si deseneaza curbele de recompensa,
-impreuna cu o versiune netezita. Figura de mai jos (`training\_comparison.png`)
-arata clar viteza de convergenta si nivelul final de performanta pentru
-fiecare algoritm.
+Pentru a vizualiza evoluția antrenării, scriptul \texttt{plot\_results.py} încarcă
+fișierele CSV generate de fiecare agent și desenează curbele de recompensă,
+împreună cu o versiune netezită. Figura~\ref{fig:training} arată clar viteza de
+convergență și nivelul final de performanță pentru fiecare algoritm.
 
 \subsection{Curbe de antrenare}
 
 \begin{figure}[h]
   \centering
   \includegraphics[width=0.9\linewidth]{../results/training_comparison.png}
-  \caption{Curbele de recompensa in timpul antrenarii pentru toti cei trei agenti.}
+  \caption{Curbele de recompensă în timpul antrenării pentru toți cei trei agenți.}
+  \label{fig:training}
 \end{figure}
 
-\subsection{Evaluare si comportament}
+\subsection{Evaluare și comportament}
 
-In plus, am implementat un script de evaluare `evaluate\_agents.py` care
-incarca modelele antrenate si ruleaza un numar fix de episoade de test pentru
-fiecare agent, cu politica pur determinista (fara explorare, $\varepsilon=0$).
-Rezultatele sunt salvate in fisiere CSV si reprezentate grafic intr-un barplot
-(`eval\_barplot.png`), care permite compararea directa a recompenselor medii.
+Am implementat și scriptul de evaluare \texttt{evaluate\_agents.py}, care
+încarcă modelele antrenate și rulează un număr fix de episoade de test pentru
+fiecare agent, cu politică pur deterministă (fără explorare, $\varepsilon=0$).
+Rezultatele sunt salvate în fișiere CSV și reprezentate grafic într-un barplot
+(\texttt{eval\_barplot.png}), care permite compararea directă a recompenselor medii.
 
-Comportamentul calitativ al agentilor a fost analizat si prin scriptul
-`visualize\_actions.py`, care deseneaza pe harta pozitiile masinii ego, colorate
-in functie de actiunea aleasa (accelerare, franare, schimbare de banda etc.).
-Aceste harti de actiuni ajuta la intelegerea tiparelor invatate de fiecare
-algoritm.
+Comportamentul calitativ al agenților a fost analizat și prin \texttt{visualize\_actions.py},
+care desenează pe hartă pozițiile mașinii \emph{ego}, colorate în funcție de acțiunea aleasă
+(accelerare, frânare, schimbare de bandă etc.). Aceste hărți de acțiuni ajută la interpretarea
+tiparelor învățate de fiecare algoritm.
 
-\section{Analiza si discutii}
+\subsection{Hiperparametri și diagrame}
 
-Rezultatele numerice arata ca agentul DQN obtine in medie cele mai mari
-recompense, atat pe parcursul antrenarii, cat si in episoadele de evaluare.
-Curba sa de invatare creste relativ rapid si se stabilizeaza la un nivel inalt,
-semn ca reteaua a invatat o politica robusta de mentinere a benzii, evitarea
-coliziunilor si control al vitezei.
-
-Agentul tabular Q-Learning reuseste sa invete un comportament rezonabil, dar
-ramane semnificativ mai slab decat DQN. Desi discretizarea de 6 dimensiuni este
-gestionabila ca marime a tabelului, ea pierde informatii fine despre dinamica
-vehiculelor din jur, iar actualizarea prin esantionare dintr-un mediu complex
-ramane dificila. Totusi, comparativ cu un agent aleator, tabularul imbunatateste
-clar frecventa coliziunilor si calitatea traiectoriei.
-
-Agentul REINFORCE cu baseline obtine performante intermediare: este mai bun decat
-tabularul, dar in medie mai slab decat DQN. Introducerea unei retele de valoare
-a redus varianta si a stabilizat invatarea fata de o versiune fara baseline,
-dar metoda ramane sensibila la hiperparametri (rata de invatare, normalizarea
-avantajelor, lungimea episoadelor). Faptul ca foloseste doar returnuri
-Monte Carlo, fara bootstrapping, face ca invatarea sa fie mai lenta si mai
-zgomotoasa.
-
-Vizualizarile actiunilor confirma aceste concluzii: DQN tinde sa pastreze o
-traiectorie mai fluida, cu schimbari de banda planificate si viteza constanta,
-in timp ce REINFORCE afiseaza uneori oscilatii intre accelerare si franare.
-Agentul tabular ia decizii mai „rigide”, fiind limitat de discretizarea mai
-grosiera a starii.
-
-\section{Concluzii si directii viitoare}
-
-In acest proiect am definit un mediu personalizat de conducere pe baza
-  exttt{highway\_env} si am comparat trei abordari de invatare prin
-intarire: Q-Learning tabular, Deep Q-Network si REINFORCE cu baseline.
-Rezultatele experimentale arata ca, pentru o reprezentare de stare continua
-si relativ bogata (25 de dimensiuni), metodele bazate pe functii de aproximare
-profunde (DQN) ofera un avantaj clar fata de un tabel discret simplu. In acelasi
-timp, un agent policy-based cu baseline poate atinge performante rezonabile,
-dar necesita o reglare mai atenta a hiperparametrilor.
-
-Ca directii viitoare, proiectul poate fi extins in mai multe moduri:
+Pentru fiecare agent am ales un set de hiperparametri care echilibrează stabilitatea și viteza de
+învățare:
 \begin{itemize}
-  \item trecerea la algoritmi actor--critic mai avansati (PPO, A2C), care
-  combina avantajele bootstrapping-ului cu stabilitatea unui objective cu
-  constrangeri;
-  \item imbunatatirea functiei de recompensa si a configuratiei de trafic,
-  pentru a viza scenarii mai realiste (depasiri, intersectii, limitari de
-  viteza variabile);
-  \item analizarea robustetii politicilor invatate la variatii ale
-  dinamici vehiculelor sau ale senzorilor (de exemplu zgomot pe observatii);
-  \item integrarea proiectului intr-o interfata grafica interactiva pentru
-  demonstratii in timp real.
+  \item \textbf{Tabular Q-Learning}: $\alpha = 0{,}05$, $\gamma = 0{,}99$, \mbox{$\varepsilon \in [1, 0{,}05]$}
+  cu decay; rata de învățare relativ mică evită oscilațiile într-un spațiu de stare discret dar dens,
+  iar discount-ul mare pune accent pe recompensele viitoare (traiectorii sigure și lungi).
+  \item \textbf{DQN}: rata de învățare $5\cdot 10^{-4}$, $\gamma = 0{,}99$, buffer de 50\,000 tranziții,
+  batch-size 64, $\varepsilon$-greedy cu scădere de la 1.0 la 0.01. Un $\gamma$ mare și replay buffer-ul
+  permit învățarea unor politici mai stabile, iar rețeaua 256–128 controlează un compromis între capacitate
+  și risc de overfitting.
+  \item \textbf{REINFORCE}: rata de învățare $10^{-3}$, $\gamma = 0{,}99$, 1000 de episoade. Learning rate-ul
+  moderat și baseline-ul de valoare ajută la reducerea varianței gradientului, dar numărul mai mare de episoade
+  este necesar deoarece update-ul se face la nivel de episod (Monte Carlo).
 \end{itemize}
 
-Per ansamblu, proiectul demonstreaza modul in care conceptele teoretice de RL
-(stare, actiune, recompensa, Q-Learning, DQN, policy gradient) pot fi aplicate
-intr-un scenariu de conducere autonoma simplificat, respectand cerintele de
-implementare, experimentare si documentare ale cursului.
+Diagramele generate sintetizează aceste alegeri:
+\begin{itemize}
+  \item \textbf{training\_comparison.png}: evoluția recompensei pe episod în timpul antrenării pentru
+  toți agenții (curbă brută și netezită);
+  \item \textbf{eval\_barplot.png}: recompensele medii de evaluare și deviațiile standard, per agent;
+  \item \textbf{actions\_dqn.png}, \textbf{actions\_reinforce.png}, \textbf{actions\_tabular.png}: hărți
+  de acțiuni care arată zonele în care fiecare agent accelerează, frânează sau schimbă banda.
+\end{itemize}
+
+Pentru raport, folosim în mod explicit \texttt{training\_comparison.png} și \texttt{eval\_barplot.png}
+pentru a susține concluziile numerice despre convergență și performanță.
+
+\section{Analiză și discuții}
+
+Rezultatele numerice arată că agentul DQN obține în medie cele mai mari
+recompense, atât pe parcursul antrenării, cât și în episoadele de evaluare.
+Curba sa de învățare crește relativ rapid și se stabilizează la un nivel înalt,
+semn că rețeaua a învățat o politică robustă de menținere a benzii, evitarea
+coliziunilor și control al vitezei.
+
+Agentul tabular Q-Learning reușește să învețe un comportament rezonabil, dar
+rămâne semnificativ mai slab decât DQN. Deși discretizarea de 6 dimensiuni este
+gestionabilă ca mărime a tabelului, ea pierde informații fine despre dinamica
+vehiculelor din jur, iar actualizarea prin eșantionare dintr-un mediu complex
+rămâne dificilă. Totuși, comparativ cu un agent aleator, tabularul îmbunătățește
+clar frecvența coliziunilor și calitatea traiectoriei.
+
+Agentul REINFORCE cu baseline obține performanțe intermediare: este mai bun decât
+tabularul, dar în medie mai slab decât DQN. Introducerea unei rețele de valoare
+a redus varianța și a stabilizat învățarea față de o versiune fără baseline,
+dar metoda rămâne sensibilă la hiperparametri (rata de învățare, normalizarea
+avantajelor, lungimea episoadelor). Faptul că folosește doar returnuri
+Monte Carlo, fără bootstrapping, face ca învățarea să fie mai lentă și mai
+zgomotoasă.
+
+Vizualizările acțiunilor confirmă aceste concluzii: DQN tinde să păstreze o
+traiectorie mai fluidă, cu schimbări de bandă planificate și viteză constantă,
+în timp ce REINFORCE afișează uneori oscilații între accelerare și frânare.
+Agentul tabular ia decizii mai „rigide”, fiind limitat de discretizarea mai
+grosieră a stării.
+
+\section{Concluzii și direcții viitoare}
+
+În acest proiect am definit un mediu personalizat de conducere pe baza
+  exttt{highway\_env} și am comparat trei abordări de învățare prin
+întărire: Q-Learning tabular, Deep Q-Network și REINFORCE cu baseline.
+Rezultatele experimentale arată că, pentru o reprezentare de stare continuă
+și relativ bogată (25 de dimensiuni), metodele bazate pe funcții de aproximare
+profunde (DQN) oferă un avantaj clar față de un tabel discret simplu. În același
+timp, un agent policy-based cu baseline poate atinge performanțe rezonabile,
+dar necesită o reglare mai atentă a hiperparametrilor.
+
+Ca direcții viitoare, proiectul poate fi extins în mai multe moduri:
+\begin{itemize}
+  \item trecerea la algoritmi actor--critic mai avansați (PPO, A2C), care
+  combină avantajele bootstrapping-ului cu stabilitatea unui obiectiv cu
+  constrângeri;
+  \item îmbunătățirea funcției de recompensă și a configurației de trafic,
+  pentru a viza scenarii mai realiste (depașiri, intersecții, limitări de
+  viteză variabile);
+  \item analizarea robusteții politicilor învățate la variații ale
+  dinamicii vehiculelor sau ale senzorilor (de exemplu zgomot pe observații);
+  \item integrarea proiectului într-o interfață grafică interactivă pentru
+  demonstrații în timp real.
+\end{itemize}
+
+Per ansamblu, proiectul demonstrează modul în care conceptele teoretice de RL
+(stare, acțiune, recompensă, Q-Learning, DQN, policy gradient) pot fi aplicate
+într-un scenariu de conducere autonomă simplificat, respectând cerințele de
+implementare, experimentare și documentare ale cursului.
 
 \end{document}
