@@ -14,7 +14,23 @@
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{tikz}
+\usepackage{listings}
+\usepackage{xcolor}
 \usetikzlibrary{arrows.meta, positioning, shapes.geometric}
+
+% Code listing style
+\lstdefinestyle{pythonstyle}{
+    language=Python,
+    basicstyle=\tiny\ttfamily,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{green!50!black},
+    stringstyle=\color{red!70!black},
+    showstringspaces=false,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{gray!10},
+    numbers=none
+}
 
 % Diagram macros (inline for portability)
 \newcommand{\RLLoopDiagramSmall}{%
@@ -66,7 +82,78 @@
   \end{columns}
 \end{frame}
 
-% ============== SLIDE 3 ==============
+% ============== SLIDE 3: CONCEPTE RL ==============
+\begin{frame}{Concepte fundamentale RL}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Markov Decision Process (MDP)}
+        \begin{itemize}
+          \item $\mathcal{S}$ — spațiul stărilor
+          \item $\mathcal{A}$ — spațiul acțiunilor
+          \item $P(s'|s,a)$ — funcția de tranziție
+          \item $R(s,a,s')$ — funcția de recompensă
+          \item $\gamma \in [0,1]$ — factor de discount
+        \end{itemize}
+      \end{block}
+      
+      \begin{block}{Obiectiv}
+        Maximizarea recompensei cumulate:
+        \[G_t = \sum_{k=0}^{\infty} \gamma^k r_{t+k+1}\]
+      \end{block}
+    \end{column}
+    
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Funcții cheie}
+        \textbf{Value Function:}
+        \[V^\pi(s) = \mathbb{E}_\pi[G_t | s_t = s]\]
+        
+        \textbf{Q-Function (Action-Value):}
+        \[Q^\pi(s,a) = \mathbb{E}_\pi[G_t | s_t = s, a_t = a]\]
+        
+        \textbf{Policy:}
+        \[\pi(a|s) = P(a_t = a | s_t = s)\]
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ============== SLIDE 4: BELLMAN ==============
+\begin{frame}{Ecuația Bellman — baza algoritmilor}
+  \begin{block}{Ecuația Bellman pentru Q-values}
+    \[Q(s,a) = \mathbb{E}\left[r + \gamma \max_{a'} Q(s', a')\right]\]
+  \end{block}
+  
+  \begin{columns}
+    \begin{column}{0.55\textwidth}
+      \textbf{Update iterativ (Q-Learning):}
+      \[Q(s,a) \leftarrow Q(s,a) + \alpha \cdot \underbrace{(r + \gamma \max_{a'} Q(s',a') - Q(s,a))}_{\text{TD error}}\]
+      
+      \vspace{0.2cm}
+      \textbf{Parametri:}
+      \begin{itemize}
+        \item $\alpha$ — learning rate (cât de mult actualizăm)
+        \item $\gamma$ — discount (importanța recompenselor viitoare)
+        \item TD error — diferența dintre target și estimare
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.4\textwidth}
+      \centering
+      \begin{tikzpicture}[>=Stealth, scale=0.8]
+        \node[circle, draw, fill=blue!20] (s) at (0,0) {$s$};
+        \node[circle, draw, fill=green!20] (s1) at (2,1) {$s'$};
+        \node[circle, draw, fill=green!20] (s2) at (2,-1) {$s''$};
+        \draw[->, thick] (s) -- node[above]{$a, r_1$} (s1);
+        \draw[->, thick] (s) -- node[below]{$a', r_2$} (s2);
+        \node[right, font=\small] at (2.5,1) {$\max Q(s',\cdot)$};
+        \node[right, font=\small] at (2.5,-1) {$\max Q(s'',\cdot)$};
+      \end{tikzpicture}
+      
+      {\footnotesize Backup diagram}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ============== SLIDE 5 ==============
 \begin{frame}{Stare, Acțiune, Recompensă}
   \begin{block}{Stare (observație)}
     Vector continuu de 25 dimensiuni: poziția, viteza și orientarea vehiculului ego + informații despre vehiculele din jur.
@@ -87,7 +174,48 @@
   \end{block}
 \end{frame}
 
-% ============== SLIDE 4 ==============
+% ============== SLIDE 6: INPUT/OUTPUT ==============
+\begin{frame}{Input/Output — Fluxul datelor}
+  \begin{columns}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Input (Observație)}
+        \textbf{Vector 25D — Kinematics:}
+        \begin{itemize}
+          \item Vehicul ego: $[x, y, v_x, v_y, \cos\theta, \sin\theta]$
+          \item 4 vehicule din jur: aceleași 6 features
+          \item Normalizate în $[0, 1]$
+        \end{itemize}
+      \end{block}
+      
+      \begin{block}{Output (Acțiune)}
+        \textbf{Index discret $\in \{0,1,2,3,4\}$}
+        \begin{itemize}
+          \item Selectat de rețeaua neuronală
+          \item $\epsilon$-greedy în training
+          \item Argmax în evaluare
+        \end{itemize}
+      \end{block}
+    \end{column}
+    
+    \begin{column}{0.48\textwidth}
+      \centering
+      \begin{tikzpicture}[>=Stealth, scale=0.75, every node/.style={font=\small}]
+        \node[draw, fill=blue!15, minimum width=2cm, minimum height=1cm] (obs) at (0,0) {Obs 25D};
+        \node[draw, fill=orange!20, minimum width=2cm, minimum height=1.5cm, align=center] (net) at (0,-2) {Neural Net\\256-128};
+        \node[draw, fill=green!20, minimum width=2cm, minimum height=1cm, align=center] (q) at (0,-4) {Q-values\\5 actiuni};
+        \node[draw, fill=red!20, circle, minimum size=0.8cm] (act) at (2.5,-4) {$a$};
+        
+        \draw[->, thick] (obs) -- (net);
+        \draw[->, thick] (net) -- (q);
+        \draw[->, thick] (q) -- node[above]{argmax} (act);
+      \end{tikzpicture}
+      
+      {\footnotesize Arhitectura DQN}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ============== SLIDE 7 ==============
 \begin{frame}{Designul mediului (environment)}
   \begin{columns}
     \begin{column}{0.5\textwidth}
@@ -171,7 +299,155 @@
   \textbf{Toți agenții} folosesc aceleași 5 acțiuni discrete și același mediu.
 \end{frame}
 
-% ============== SLIDE 6 ==============
+% ============== SLIDE 9: CODE Q-LEARNING ==============
+\begin{frame}[fragile]{Cod: Tabular Q-Learning}
+  \begin{columns}
+    \begin{column}{0.55\textwidth}
+      \begin{lstlisting}[style=pythonstyle]
+class TabularQAgent:
+    def __init__(self, obs_bins, action_size, 
+                 alpha=0.05, gamma=0.99, epsilon=1.0):
+        self.q_table = np.zeros(obs_bins + [action_size])
+        self.alpha = alpha    # learning rate
+        self.gamma = gamma    # discount factor
+        self.epsilon = epsilon
+
+    def select_action(self, state):
+        """Epsilon-greedy action selection."""
+        if np.random.rand() < self.epsilon:
+            return np.random.randint(self.action_size)
+        return np.argmax(self.q_table[state])
+
+    def update(self, state, action, reward, next_state, done):
+        """Bellman update."""
+        best_next = np.max(self.q_table[next_state])
+        target = reward + self.gamma * best_next * (1 - done)
+        error = target - self.q_table[state + (action,)]
+        self.q_table[state + (action,)] += self.alpha * error
+      \end{lstlisting}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \textbf{Explicație:}
+      \begin{itemize}
+        \item \texttt{q\_table}: matrice N-dim pentru Q-values
+        \item \texttt{select\_action}: explorare vs exploatare
+        \item \texttt{update}: formula Bellman
+        \item TD error = target $-$ Q curent
+      \end{itemize}
+      
+      \vspace{0.3cm}
+      \textbf{Discretizare:}
+      
+      Stare continuă $\to$ index în tabel
+      
+      $[x, y, fuel, ...] \to (2, 3, 1, ...)$
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ============== SLIDE 10: CODE DQN ==============
+\begin{frame}[fragile]{Cod: DQN Network \& Agent}
+  \begin{columns}
+    \begin{column}{0.52\textwidth}
+      \begin{lstlisting}[style=pythonstyle]
+class DQNNetwork(nn.Module):
+    def __init__(self, obs_dim, action_size, 
+                 hidden_dims=[256, 128]):
+        super().__init__()
+        layers = []
+        input_dim = obs_dim
+        for hidden_dim in hidden_dims:
+            layers.append(nn.Linear(input_dim, hidden_dim))
+            layers.append(nn.ReLU())
+            input_dim = hidden_dim
+        self.hidden = nn.Sequential(*layers)
+        self.output = nn.Linear(hidden_dims[-1], action_size)
+
+    def forward(self, state):
+        x = self.hidden(state)
+        return self.output(x)  # Q-values
+      \end{lstlisting}
+      
+      \vspace{0.2cm}
+      \begin{lstlisting}[style=pythonstyle]
+# Epsilon-greedy action selection
+if np.random.rand() < self.epsilon:
+    return np.random.randint(self.action_size)
+return self.policy_net(state).argmax().item()
+      \end{lstlisting}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \textbf{Arhitectura:}
+      \begin{itemize}
+        \item Input: 25 features (stare)
+        \item Hidden: 256 $\to$ 128 neuroni
+        \item Output: 5 Q-values (per acțiune)
+        \item Activare: ReLU
+      \end{itemize}
+      
+      \vspace{0.3cm}
+      \textbf{Tehnici cheie:}
+      \begin{itemize}
+        \item \textbf{Experience Replay}: buffer de tranziții, sampling random
+        \item \textbf{Target Network}: rețea separată pentru stabilitate
+        \item \textbf{Double DQN}: reduce overestimation
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ============== SLIDE 11: CODE REINFORCE ==============
+\begin{frame}[fragile]{Cod: REINFORCE cu Baseline}
+  \begin{columns}
+    \begin{column}{0.55\textwidth}
+      \begin{lstlisting}[style=pythonstyle]
+class REINFORCEAgent:
+    def __init__(self, obs_dim, action_dim, lr=3e-4):
+        self.policy = PolicyNetwork(obs_dim, action_dim)
+        self.value = ValueNetwork(obs_dim)  # baseline
+        
+    def select_action(self, obs):
+        logits = self.policy(obs)
+        dist = torch.distributions.Categorical(logits=logits)
+        action = dist.sample()
+        return action.item(), dist.log_prob(action)
+        
+    def update(self, trajectory):
+        # Compute discounted returns G_t
+        returns = []
+        G = 0
+        for r in reversed(rewards):
+            G = r + self.gamma * G
+            returns.insert(0, G)
+        
+        # Advantage = return - baseline
+        advantages = returns - self.value(states).detach()
+        
+        # Policy gradient loss
+        policy_loss = -(log_probs * advantages).mean()
+      \end{lstlisting}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \textbf{Policy Gradient:}
+      \[\nabla J \approx \sum_t \nabla \log \pi(a_t|s_t) \cdot A_t\]
+      
+      \vspace{0.2cm}
+      \textbf{Componente:}
+      \begin{itemize}
+        \item \textbf{Policy Net}: $\pi(a|s)$ — probabilități acțiuni
+        \item \textbf{Value Net}: $V(s)$ — baseline pentru variance reduction
+        \item \textbf{Advantage}: $A_t = G_t - V(s_t)$
+      \end{itemize}
+      
+      \vspace{0.2cm}
+      \textbf{Monte Carlo:}
+      
+      Așteptăm sfârșitul episodului pentru $G_t$
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ============== SLIDE 12 ==============
 \begin{frame}{Curbe de antrenare}
   \centering
   \includegraphics[width=0.85\textwidth]{../results/training_comparison.png}
@@ -180,7 +456,7 @@
   {\small DQN converge cel mai rapid și atinge recompense mai mari. REINFORCE este mai instabil. Tabular învață mai lent.}
 \end{frame}
 
-% ============== SLIDE 7 ==============
+% ============== SLIDE 13 ==============
 \begin{frame}{Vizualizarea comportamentului}
   \begin{columns}
     \begin{column}{0.33\textwidth}
@@ -208,7 +484,7 @@
   \end{itemize}
 \end{frame}
 
-% ============== SLIDE 8 ==============
+% ============== SLIDE 14 ==============
 \begin{frame}{Evaluare și comparație}
   \begin{columns}
     \begin{column}{0.55\textwidth}
@@ -231,7 +507,7 @@
   \end{columns}
 \end{frame}
 
-% ============== SLIDE 9 ==============
+% ============== SLIDE 15 ==============
 \begin{frame}{Hiperparametri cheie}
   \begin{table}
     \centering
@@ -256,7 +532,7 @@
   \textbf{Ce a fost dificil:} stabilitatea policy gradient, designul recompensei.
 \end{frame}
 
-% ============== SLIDE 10 ==============
+% ============== SLIDE 16 ==============
 \begin{frame}{Lecții învățate și direcții viitoare}
   \begin{columns}
     \begin{column}{0.48\textwidth}
@@ -287,7 +563,7 @@
   \end{block}
 \end{frame}
 
-% ============== SLIDE 11 ==============
+% ============== SLIDE 17 ==============
 \begin{frame}{}
   \centering
   \Huge \textbf{Întrebări?}

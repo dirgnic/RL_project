@@ -1,0 +1,48 @@
+\frametitle{Cod: REINFORCE cu Baseline}
+\begin{columns}
+    \begin{column}{0.55\textwidth}
+      \begin{lstlisting}[style=pythonstyle]
+class REINFORCEAgent:
+    def __init__(self, obs_dim, action_dim, lr=3e-4):
+        self.policy = PolicyNetwork(obs_dim, action_dim)
+        self.value = ValueNetwork(obs_dim)  # baseline
+
+    def select_action(self, obs):
+        logits = self.policy(obs)
+        dist = torch.distributions.Categorical(logits=logits)
+        action = dist.sample()
+        return action.item(), dist.log_prob(action)
+
+    def update(self, trajectory):
+        # Compute discounted returns G_t
+        returns = []
+        G = 0
+        for r in reversed(rewards):
+            G = r + self.gamma * G
+            returns.insert(0, G)
+
+        # Advantage = return - baseline
+        advantages = returns - self.value(states).detach()
+
+        # Policy gradient loss
+        policy_loss = -(log_probs * advantages).mean()
+      \end{lstlisting}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \textbf{Policy Gradient:}
+      \[\nabla J \approx \sum_t \nabla \log \pi(a_t|s_t) \cdot A_t\]
+
+      \vspace{0.2cm}
+      \textbf{Componente:}
+      \begin{itemize}
+        \item \textbf{Policy Net}: $\pi(a|s)$ — probabilități acțiuni
+        \item \textbf{Value Net}: $V(s)$ — baseline pentru variance reduction
+        \item \textbf{Advantage}: $A_t = G_t - V(s_t)$
+      \end{itemize}
+
+      \vspace{0.2cm}
+      \textbf{Monte Carlo:}
+
+      Așteptăm sfârșitul episodului pentru $G_t$
+    \end{column}
+  \end{columns}
