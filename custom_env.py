@@ -15,7 +15,7 @@ class MyCustomEnv(AbstractEnv):
             "action": {"type": "ContinuousAction"},
             "simulation_frequency": 15,
             "policy_frequency": 1, 
-            "duration": 300,
+            "duration": 500,
             "screen_width": 1280,
             "screen_height": 740,
             "scaling": 5.5,                 # Explicitly set scaling (pixels per meter)
@@ -149,14 +149,14 @@ class MyCustomEnv(AbstractEnv):
         self.vehicle = Vehicle(
             self.road,
             position=[0, 0],
-            speed=0.3,
+            speed=2.0,
             heading=0
         )
         self.road.vehicles.append(self.vehicle)
         obstacle = IDMVehicle(self.road, position=[75, 0], speed=5)
         obstacle2 = IDMVehicle(self.road, position=[100, 200], speed=5)
         obstacle3 = IDMVehicle(self.road, position=[50, -75], speed=7)
-        for i in range(0,20):
+        for i in range(0,10):
             vehicle=IDMVehicle(self.road, position=[np.random.randint(0,100), np.random.randint(0,200)],speed=np.random.randint(3,7))
             vehicle.lane_index=self.road.network.get_closest_lane_index(vehicle.position)
             self.road.vehicles.append(vehicle)
